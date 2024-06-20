@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import configparser
+import cmd
 import csv
 import multiprocessing
 import os
 import pathlib
+import re
 import sys
 import time
 import webbrowser
@@ -135,12 +137,44 @@ def get_args():
     args = parser.parse_args()
     return args
 
+class GroceryCLI(cmd.Cmd):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._grocery_data = ""
+
+    def do_exit(self, line):
+        return True
+
+    def do_EOF(self, line):
+        return True
+
+    def do_got(self, line):
+        item = line
+        identity_regex = re.compile(r"- \[[ x]?\] {}".format(item))
+        self._grocery_data = identity_regex.sub(f"- [x] {item}",
+                                                self._grocery_data, re.M)
+
+    def do_ls(self, line):
+        print(self._grocery_data)
+
 
 def main():
     args = get_args()
 
     config = configparser.ConfigParser()
     config.read(args.config_file)
+
+
+    grocery_set = {}
+    with open("common_groceries_sample.md", "r") as f:
+        raw_data = f.read()
+        cli = GroceryCLI()
+        cli._grocery_data = raw_data
+        cli.cmdloop()
+        return
+
+
+
     db = grocery_scanner.core.ShelveRepository()
     csv_db = grocery_scanner.core.CSVRepository()
     for item_name, item_url in config["DEFAULT"].items():
