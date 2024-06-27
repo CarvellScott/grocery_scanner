@@ -61,7 +61,7 @@ class ShelveRepository(AbstractRepository):
             return [_ for _ in db]
 
     def obj_to_reference(self, obj):
-        return obj.reference
+        return str(obj.reference)
 
     def keys(self):
         with shelve.open(self._db_filename) as db:
