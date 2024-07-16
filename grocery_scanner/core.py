@@ -18,9 +18,13 @@ class AbstractRepository(typing.Protocol):
 
 
 class CSVRepository(AbstractRepository):
-    def __init__(self):
-        self._csv_filename = "data.csv"
+    def __init__(self, reference, filename):
+        self._csv_filename = filename
         self._data = set()
+        self._reference = reference
+
+    def obj_to_reference(self, obj):
+        return hash(obj)
 
     def save(self, obj):
         self._data.add(obj)
@@ -36,6 +40,29 @@ class CSVRepository(AbstractRepository):
             writer.writeheader()
             for row in entries:
                 writer.writerow(row)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        return
+
+
+class MultiCSVRepo(AbstractRepository):
+    def __init__(self):
+        self._csv_repos = {
+            "entities": CSVRepository("entities", "entities.csv"),
+            "components": CSVRepository("components", "components.csv")
+        }
+
+    def obj_to_reference(self, obj):
+        return obj._reference
+
+    def save(self, obj):
+        self._csv_repos[self.obj_to_reference(obj)] = obj
+
+    def load(self, reference):
+        return self._csv_repos[reference]
 
 
 class ShelveRepository(AbstractRepository):

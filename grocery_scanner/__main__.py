@@ -170,6 +170,14 @@ class DB2WebAdapter:
         bottle.response.content_type = 'text/css; charset=UTF8'
         return _CSS_TEXT
 
+    def text_list(self):
+        db = self._db
+        item_list = [db[key] for key in db.keys()]
+        bottle.response.content_type = 'text/plain; charset=UTF8'
+        formatter = "- [ ] {}".format
+        items_str = "\n".join(map(formatter, item_list))
+        return items_str
+
 
 def main():
     args = get_args()
@@ -179,7 +187,7 @@ def main():
 
 
     db = grocery_scanner.core.ShelveRepository()
-    csv_db = grocery_scanner.core.CSVRepository()
+    csv_db = grocery_scanner.core.CSVRepository("bwah", "data.csv")
 
     ref_iter = reference_iter()
     identity_regex = re.compile(r"- \[([ x])\] (.*)")
@@ -203,6 +211,7 @@ def main():
     # The goal is for the entire API to be accessible via NFC tags/QR codes.
     app.route("/", ["GET"], api.home_page)
     app.route("/items/<reference>", ["GET"], api.individual_item)
+    app.route("/text_list", ["GET"], api.text_list)
     app.route("/nfc.csv", ["GET"], api.nfc_csv)
     app.route("/nfc<path:path>", ["GET"], api.nfc_tag_redirect)
     app.route("/styles.css", ["GET"], api.style)
