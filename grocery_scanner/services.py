@@ -9,9 +9,9 @@ def nfc_file_from_repo(nfc_endpoint_prefix, item_list):
     for item in item_list:
         entry = {}
         entry["Type"] = "Link"
-        entry["Content"] = f"{nfc_endpoint_prefix}/{item.name}"
+        entry["Content"] = f"{nfc_endpoint_prefix}/{item.reference}"
         entry["URI type"] = "URL"
-        entry["Description"] = ""
+        entry["Description"] = f"{item.name}"
         entry["Interaction counter"] = "no"
         entry["UID mirror"] = "no"
         entry["Interaction counter mirror"] = "no"
