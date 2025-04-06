@@ -3,6 +3,7 @@ import argparse
 import configparser
 import csv
 import itertools
+import json
 import multiprocessing
 import os
 import pathlib
@@ -90,18 +91,67 @@ ITEM_PAGE = """
     <div>
         Pretend that this is a page for {{item.name}}.
     </div>
+    <form action="/items/{{item.reference}}">
+        <input type="number" id="quantity" name="quantity">
+        <input type="submit" value="Add to cart">
+    </form>
     <ul>
         <li>
-            <a href="/items/{{item.reference}}/action=request"> Request </a>
+            <a href="/items/{{item.reference}}?action=request"> Request </a>
         </li>
         <li>
-            <a href="/items/{{item.reference}}/action=fulfill"> Fulfill </a>
+            <a href="/items/{{item.reference}}?action=fulfill"> Fulfill </a>
         </li>
     </ul>
 </body>
 </html>
 """
 
+LOGWATCH_PAGE = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <script>
+            var es = new EventSource("logstream");
+            es.onmessage = function(e) {
+                document.getElementById("log").innerHTML = e.data;
+            }
+        </script>
+    </head>
+    <body>
+        <pre id="log">No events yet.</pre>
+    </body>
+</html>
+"""
+
+CART_PAGE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <h1>Cart</h1>
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>URL</th>
+        </tr>
+        % for item, quantity in cart.items():
+            <tr>
+                <td>
+                    {{quantity}} x <a href="/items/{{item.reference}}">{{item.name}}</a>
+                </td>
+                <td>
+                    <a href={{item.url}} target="_blank">Shop Online</a>
+                </td>
+            </tr>
+        % end
+    </table>
+</body>
+</html>
+"""
 class ServerProcess(multiprocessing.Process):
     def __init__(self, app, host, port):
         super().__init__()
@@ -116,6 +166,7 @@ class ServerProcess(multiprocessing.Process):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-c",
         "--config-file",
         type=pathlib.Path,
         required=not os.getenv("GROCERY_SCANNER_CONFIG"),
@@ -125,12 +176,6 @@ def get_args():
     return args
 
 
-def reference_iter():
-    raw_iter = itertools.count()
-    for i in raw_iter:
-        yield f"{i:03}"
-
-
 class DB2WebAdapter:
     def __init__(self, db):
         self._db = db
@@ -138,26 +183,38 @@ class DB2WebAdapter:
     def individual_item(self, reference):
         item = self._db.load(reference)
         action = bottle.request.params.get("action")
+        secret = "bwah"
+        cart = bottle.request.get_cookie("cart", secret=secret) or dict()
+        match action:
+            case "request":
+                cart[item.reference] = 1
+                bottle.response.set_cookie("cart", cart, path="/", secret=secret)
+                print(cart, file=sys.stderr)
+                return bottle.redirect("/cart")
+            case "fulfill":
+                return "pretend the item was fulfilled."
+
 
         template = bottle.SimpleTemplate(ITEM_PAGE)
-        return template.render(css_text=_CSS_TEXT, item=item)
+        return template.render(item=item)
 
     def home_page(self):
         db = self._db
         item_list = [db[key] for key in db.keys()]
         template = bottle.SimpleTemplate(HOME_PAGE)
-        return template.render(css_text=_CSS_TEXT, items=item_list)
+        return template.render(items=item_list)
 
     def nfc_csv(self):
         db = self._db
         item_list = [db[key] for key in db.keys()]
+
         urlparts = bottle.request.urlparts
         scheme = urlparts.scheme
         netloc = urlparts.netloc
         nfc_endpoint_prefix = f"{scheme}://{netloc}/items"
 
         bottle.response.content_type = 'text/plain; charset=UTF8'
-        bottle.response.content_type = 'text/csv; charset=UTF8'
+        #bottle.response.content_type = 'text/csv; charset=UTF8'
         return grocery_scanner.services.nfc_file_from_repo(
             nfc_endpoint_prefix,
             item_list
@@ -178,20 +235,32 @@ class DB2WebAdapter:
         items_str = "\n".join(map(formatter, item_list))
         return items_str
 
+    def logwatch(self):
+        return bottle.SimpleTemplate(LOGWATCH_PAGE).render()
 
-def main():
-    args = get_args()
+    def logstream(self):
+        db = self._db
+        item_list = [db[key] for key in db.keys()]
+        bottle.response.content_type = "text/event-stream"
+        bottle.response.cache_control = "no-cache"
+        raw_data = [f"data: {item.name}\n" for item in item_list]
+        data = "".join(raw_data)
+        data += "\n"
+        yield data
 
-    config = configparser.ConfigParser()
-    config.read(args.config_file)
+    def cart(self):
+        db = self._db
+
+        secret = "bwah"
+        cookie_cart = bottle.request.get_cookie("cart", secret=secret) or dict()
+        cart = {db.load(key): quantity for key, quantity in cookie_cart.items()}
+        template = bottle.SimpleTemplate(CART_PAGE)
+        return template.render(cart=cart)
 
 
-    db = grocery_scanner.core.ShelveRepository()
-    csv_db = grocery_scanner.core.CSVRepository("bwah", "data.csv")
-
-    ref_iter = reference_iter()
+def read_items_from_markdown(markdown_filename):
     identity_regex = re.compile(r"- \[([ x])\] (.*)")
-    with open("common_groceries_sample.md", "r") as f:
+    with open(markdown_filename, "r") as f:
         raw_data = f.read()
         for i, line in enumerate(raw_data.splitlines()):
             regex_match = identity_regex.search(line)
@@ -199,35 +268,49 @@ def main():
                 continue
             if regex_match:
                 status, name = regex_match.groups()
-            reference = next(ref_iter)
+            reference = f"{i:03}"
             item = grocery_scanner.models.GroceryItem(reference, name, "about:blank")
-            db.save(item)
-            csv_db.save(item)
+            yield item
 
 
-    csv_db.dump()
+def main():
+    args = get_args()
+
+    config = configparser.ConfigParser()
+    config.read(args.config_file)
+
+    cls = grocery_scanner.models.GroceryItem
+    csv_db = grocery_scanner.core.CSVRepository(cls, "data.csv")
+
+    for item in read_items_from_markdown("common_groceries_sample.md"):
+        csv_db.save(item)
+
     app = bottle.Bottle()
-    api = DB2WebAdapter(db)
+    api = DB2WebAdapter(csv_db)
     # The goal is for the entire API to be accessible via NFC tags/QR codes.
+    # Therefore, most resources need to be accessible with GET
     app.route("/", ["GET"], api.home_page)
     app.route("/items/<reference>", ["GET"], api.individual_item)
     app.route("/text_list", ["GET"], api.text_list)
     app.route("/nfc.csv", ["GET"], api.nfc_csv)
     app.route("/nfc<path:path>", ["GET"], api.nfc_tag_redirect)
     app.route("/styles.css", ["GET"], api.style)
+    app.route("/logwatch", ["GET"], api.logwatch)
+    app.route("/logstream", ["GET"], api.logstream)
+    app.route("/cart", ["GET"], api.cart)
 
     server_start_time = time.perf_counter()
     server_proc = ServerProcess(app, host="0.0.0.0", port=8080)
     server_proc.start()
     print(f"Server started in {time.perf_counter() - server_start_time}")
     browser_start_time = time.perf_counter()
-    webbrowser.open("http://localhost:8080")
+    #webbrowser.open("http://localhost:8080")
     print(f"Browser started in {time.perf_counter() - browser_start_time}")
 
     while True:
         pass
     server_proc.terminate()
 
+
 if __name__ == "__main__":
     main()
-
