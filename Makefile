@@ -11,7 +11,7 @@ build: requirements.txt ## Install dependencies to build directory
 	mkdir -p build/
 	pip install -t build/ -r requirements.txt
 
-$(SERVER_EXECUTABLE): build grocery_scanner/__main__.py ## Make the executable
+$(SERVER_EXECUTABLE): build grocery_scanner/* ## Make the executable
 	rm -r build/grocery_scanner
 	cp -r grocery_scanner build/
 	python3 -m zipapp --compress -p '/usr/bin/env python3' --output $(SERVER_EXECUTABLE) --main grocery_scanner.__main__:main build/
