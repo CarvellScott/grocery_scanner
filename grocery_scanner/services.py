@@ -2,16 +2,16 @@
 import csv
 import io
 
-def nfc_file_from_repo(nfc_endpoint_prefix, item_list):
+def nfc_file_from_repo(item_list):
     # This function converts the list of items into a format that can be used
     # with NXP Tag Writer (Android app) to write NFC tags in bulk.
     entries = list()
-    for item in item_list:
+    for item_name, item_url in item_list:
         entry = {}
         entry["Type"] = "Link"
-        entry["Content"] = f"{nfc_endpoint_prefix}/{item.reference}"
+        entry["Content"] = item_url
         entry["URI type"] = "URL"
-        entry["Description"] = f"{item.name}"
+        entry["Description"] = item_name
         entry["Interaction counter"] = "no"
         entry["UID mirror"] = "no"
         entry["Interaction counter mirror"] = "no"

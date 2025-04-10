@@ -21,7 +21,7 @@ import grocery_scanner.services
 
 _CSS_TEXT = """
 body {
-  max-width:650px;
+  max-width:767px;
   margin:40px auto;
   padding:0 10px;
   font:18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -61,11 +61,13 @@ HOME_PAGE = """
     </div>
     <table>
         <tr>
+            <th></th>
             <th>Item</th>
-            <th>Shop Online</th>
+            <th>Link</th>
         </tr>
         % for item in items:
             <tr>
+                <td><input type="checkbox"></td>
                 <td>
                     <a href="/items/{{item.reference}}">{{item.name}}</a>
                 </td>
@@ -91,7 +93,7 @@ ITEM_PAGE = """
     <div>
         Pretend that this is a page for {{item.name}}.
     </div>
-    <form action="/items/{{item.reference}}">
+    <form action="/cart/{{item.reference}}">
         <input type="number" id="quantity" name="quantity">
         <input type="submit" value="Add to cart">
     </form>
@@ -100,8 +102,10 @@ ITEM_PAGE = """
             <a href="/items/{{item.reference}}?action=request"> Request </a>
         </li>
         <li>
-            <a href="/items/{{item.reference}}?action=fulfill"> Fulfill </a>
+            <a href="/nfc/items/{{item.reference}}"> Test NFC Redirect </a>
         </li>
+        <li>
+            <a href="{{item.url}}" target="_blank"> Shop Online</a>
     </ul>
 </body>
 </html>
@@ -152,6 +156,7 @@ CART_PAGE = """
 </body>
 </html>
 """
+
 class ServerProcess(multiprocessing.Process):
     def __init__(self, app, host, port):
         super().__init__()
@@ -182,9 +187,9 @@ class DB2WebAdapter:
 
     def individual_item(self, reference):
         item = self._db.load(reference)
-        action = bottle.request.params.get("action")
         secret = "bwah"
         cart = bottle.request.get_cookie("cart", secret=secret) or dict()
+        action = bottle.request.params.get("action")
         match action:
             case "request":
                 cart[item.reference] = 1
@@ -211,28 +216,35 @@ class DB2WebAdapter:
         urlparts = bottle.request.urlparts
         scheme = urlparts.scheme
         netloc = urlparts.netloc
-        nfc_endpoint_prefix = f"{scheme}://{netloc}/items"
+        nfc_item_list = []
+        for item in item_list:
+            url = f"{scheme}://{netloc}/nfc/items/{item.reference}"
+            name = repr(item.name)
+            nfc_item_list.append((name, url))
 
-        bottle.response.content_type = 'text/plain; charset=UTF8'
-        #bottle.response.content_type = 'text/csv; charset=UTF8'
+        #bottle.response.content_type = 'text/plain; charset=UTF8'
+        bottle.response.content_type = 'text/csv; charset=UTF8'
         return grocery_scanner.services.nfc_file_from_repo(
-            nfc_endpoint_prefix,
-            item_list
+            nfc_item_list
         )
 
-    def nfc_tag_redirect(self, path):
-        return bottle.redirect(path)
+    def nfc_tag_redirect(self, redirect_url):
+        #return f"Redirecting you to {redirect_url}"
+        return bottle.redirect(redirect_url)
 
     def style(self):
         bottle.response.content_type = 'text/css; charset=UTF8'
         return _CSS_TEXT
 
-    def text_list(self):
+    def markdown_grocery_list(self):
         db = self._db
         item_list = [db[key] for key in db.keys()]
         bottle.response.content_type = 'text/plain; charset=UTF8'
-        formatter = "- [ ] {}".format
-        items_str = "\n".join(map(formatter, item_list))
+        formatter = "- [ ] [{name}]({url})".format
+        lines = []
+        for item in item_list:
+            lines.append(formatter(name=item.name, url=item.url))
+        items_str = "\n".join(lines)
         return items_str
 
     def logwatch(self):
@@ -256,6 +268,19 @@ class DB2WebAdapter:
         cart = {db.load(key): quantity for key, quantity in cookie_cart.items()}
         template = bottle.SimpleTemplate(CART_PAGE)
         return template.render(cart=cart)
+
+    def get_config(self):
+        db = self._db
+        item_list = [db[key] for key in db.keys()]
+        config = configparser.ConfigParser()
+        import io
+        strio = io.StringIO()
+        for item in item_list:
+            config.add_section(item.reference)
+            config[item.reference] = vars(item)
+        config.write(strio)
+        bottle.response.content_type = 'text/plain; charset=UTF8'
+        return strio.getvalue()
 
 
 def read_items_from_markdown(markdown_filename):
@@ -291,13 +316,14 @@ def main():
     # Therefore, most resources need to be accessible with GET
     app.route("/", ["GET"], api.home_page)
     app.route("/items/<reference>", ["GET"], api.individual_item)
-    app.route("/text_list", ["GET"], api.text_list)
+    app.route("/grocery_list.md", ["GET"], api.markdown_grocery_list)
     app.route("/nfc.csv", ["GET"], api.nfc_csv)
-    app.route("/nfc<path:path>", ["GET"], api.nfc_tag_redirect)
+    app.route("/nfc<redirect_url:path>", ["GET"], api.nfc_tag_redirect)
     app.route("/styles.css", ["GET"], api.style)
     app.route("/logwatch", ["GET"], api.logwatch)
     app.route("/logstream", ["GET"], api.logstream)
     app.route("/cart", ["GET"], api.cart)
+    app.route("/config.ini", ["GET"], api.get_config)
 
     server_start_time = time.perf_counter()
     server_proc = ServerProcess(app, host="0.0.0.0", port=8080)

@@ -35,8 +35,8 @@ class CSVRepository(AbstractRepository):
     def clear(self):
         self._data.clear()
 
-    def dump(self):
-        with open(self._csv_filename, "w") as f:
+    def write_to_file(self, csv_filename):
+        with open(csv_filename, "w") as f:
             entries = list(map(vars, self._data))
             header = tuple(entries[0].keys())
             writer = csv.DictWriter(f, header, dialect="unix")
@@ -44,8 +44,8 @@ class CSVRepository(AbstractRepository):
             for row in entries:
                 writer.writerow(row)
 
-    def from_file(self):
-        with open(self._csv_filename, "r") as f:
+    def read_from_file(self, csv_filename):
+        with open(csv_filename, "r") as f:
             reader = csv.DictReader(f, fieldnames=["reference", "name", "url"], dialect="unix")
             for i, row in enumerate(reader):
                 if i == 0:
