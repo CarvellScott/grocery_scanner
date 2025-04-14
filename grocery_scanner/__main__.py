@@ -72,7 +72,7 @@ HOME_PAGE = """
                     <a href="/items/{{item.reference}}">{{item.name}}</a>
                 </td>
                 <td>
-                    <a href={{item.url}} target="_blank">Shop Online</a>
+                    <a href={{item.url}}>Shop Online</a>
                 </td>
             </tr>
         % end
@@ -105,7 +105,7 @@ ITEM_PAGE = """
             <a href="/nfc/items/{{item.reference}}"> Test NFC Redirect </a>
         </li>
         <li>
-            <a href="{{item.url}}" target="_blank"> Shop Online</a>
+            <a href="{{item.url}}"> Shop Online</a>
     </ul>
 </body>
 </html>
@@ -284,7 +284,7 @@ class DB2WebAdapter:
 
 
 def read_items_from_markdown(markdown_filename):
-    identity_regex = re.compile(r"- \[([ x])\] (.*)")
+    identity_regex = re.compile(r"- \[[ x]\] ?\[(.*)\]\((.*)\)")
     with open(markdown_filename, "r") as f:
         raw_data = f.read()
         for i, line in enumerate(raw_data.splitlines()):
@@ -292,9 +292,9 @@ def read_items_from_markdown(markdown_filename):
             if not regex_match:
                 continue
             if regex_match:
-                status, name = regex_match.groups()
+                name, url = regex_match.groups()
             reference = f"{i:03}"
-            item = grocery_scanner.models.GroceryItem(reference, name, "about:blank")
+            item = grocery_scanner.models.GroceryItem(reference, name, url)
             yield item
 
 
@@ -307,7 +307,7 @@ def main():
     cls = grocery_scanner.models.GroceryItem
     csv_db = grocery_scanner.core.CSVRepository(cls, "data.csv")
 
-    for item in read_items_from_markdown("common_groceries_sample.md"):
+    for item in read_items_from_markdown("grocery_list.md"):
         csv_db.save(item)
 
     app = bottle.Bottle()
