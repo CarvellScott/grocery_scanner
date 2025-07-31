@@ -2,6 +2,7 @@
 import argparse
 import configparser
 import csv
+import io
 import itertools
 import json
 import multiprocessing
@@ -10,6 +11,7 @@ import pathlib
 import re
 import sys
 import time
+import uuid
 import webbrowser
 import xml.etree.ElementTree as ET
 
@@ -59,6 +61,14 @@ HOME_PAGE = """
         random experiments by hostname instead of by ip address.
         And there are no cache issues.
     </div>
+    <h2>Important Links</h2>
+    <ul>
+    <li><a href="/logwatch"> logwatch </a>
+    <li><a href="/cart"> cart </a>
+
+    <li><a href="/grocery_list.md"</a>
+    <li><a href="/nfc.csv">Downloadable .csv to write NFC tags in bulk</a>
+    <li><a href="/config.ini">config.ini (prob shouldn't expose this)</a>
     <table>
         <tr>
             <th></th>
@@ -184,10 +194,11 @@ def get_args():
 class DB2WebAdapter:
     def __init__(self, db):
         self._db = db
+        self._secret = str(uuid.uuid4())
 
     def individual_item(self, reference):
         item = self._db.load(reference)
-        secret = "bwah"
+        secret = self._secret
         cart = bottle.request.get_cookie("cart", secret=secret) or dict()
         action = bottle.request.params.get("action")
         match action:
@@ -210,6 +221,9 @@ class DB2WebAdapter:
         return template.render(items=item_list)
 
     def nfc_csv(self):
+        """
+        Produce a .csv file of URLS compatible with NXP Tag Writer
+        """
         db = self._db
         item_list = [db[key] for key in db.keys()]
 
@@ -237,6 +251,10 @@ class DB2WebAdapter:
         return _CSS_TEXT
 
     def markdown_grocery_list(self):
+        """
+        Produce a markdown-formatted grocery list, ideal for importing into
+        Obsidian
+        """
         db = self._db
         item_list = [db[key] for key in db.keys()]
         bottle.response.content_type = 'text/plain; charset=UTF8'
@@ -255,6 +273,7 @@ class DB2WebAdapter:
         item_list = [db[key] for key in db.keys()]
         bottle.response.content_type = "text/event-stream"
         bottle.response.cache_control = "no-cache"
+        # Placeholder data
         raw_data = [f"data: {item.name}\n" for item in item_list]
         data = "".join(raw_data)
         data += "\n"
@@ -262,8 +281,7 @@ class DB2WebAdapter:
 
     def cart(self):
         db = self._db
-
-        secret = "bwah"
+        secret = self._secret
         cookie_cart = bottle.request.get_cookie("cart", secret=secret) or dict()
         cart = {db.load(key): quantity for key, quantity in cookie_cart.items()}
         template = bottle.SimpleTemplate(CART_PAGE)
@@ -273,7 +291,6 @@ class DB2WebAdapter:
         db = self._db
         item_list = [db[key] for key in db.keys()]
         config = configparser.ConfigParser()
-        import io
         strio = io.StringIO()
         for item in item_list:
             config.add_section(item.reference)
@@ -304,6 +321,8 @@ def main():
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
+    # I want the grocery data to be readable from some simple format. Not sure
+    # if markdown or .csv would be easiest. Should probably support both.
     cls = grocery_scanner.models.GroceryItem
     csv_db = grocery_scanner.core.CSVRepository(cls, "data.csv")
 
