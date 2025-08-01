@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div>
+        If you are reading this, you're now able to access Carvell's
+        random experiments by hostname instead of by ip address.
+        And there are no cache issues.
+    </div>
+    <h2>Important Links</h2>
+    <ul>
+    <li><a href="/logwatch"> logwatch </a>
+    <li><a href="/cart"> cart </a>
+
+    <li><a href="/grocery_list.md"</a>
+    <li><a href="/nfc.csv">Downloadable .csv to write NFC tags in bulk</a>
+    <li><a href="/config.ini">config.ini (prob shouldn't expose this)</a>
+    <table>
+        <tr>
+            <th></th>
+            <th>Item</th>
+            <th>Link</th>
+        </tr>
+        % for item in items:
+            <tr>
+                <td><input type="checkbox"></td>
+                <td>
+                    <a href="/items/{{item.reference}}">{{item.name}}</a>
+                </td>
+                <td>
+                    <a href={{item.url}}>Shop Online</a>
+                </td>
+            </tr>
+        % end
+    </table>
+</body>
+</html>

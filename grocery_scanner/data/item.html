@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div>
+        Pretend that this is a page for {{item.name}}.
+    </div>
+    <form action="/cart/{{item.reference}}">
+        <input type="number" id="quantity" name="quantity">
+        <input type="submit" value="Add to cart">
+    </form>
+    <ul>
+        <li>
+            <a href="/items/{{item.reference}}?action=request"> Request </a>
+        </li>
+        <li>
+            <a href="/nfc/items/{{item.reference}}"> Test NFC Redirect </a>
+        </li>
+        <li>
+            <a href="{{item.url}}"> Shop Online</a>
+    </ul>
+</body>
+</html>

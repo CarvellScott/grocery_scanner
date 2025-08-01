@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script>
+            var es = new EventSource("logstream");
+            es.onmessage = function(e) {
+                document.getElementById("log").innerHTML = e.data;
+            }
+        </script>
+    </head>
+    <body>
+        <pre id="log">No events yet.</pre>
+    </body>
+</html>

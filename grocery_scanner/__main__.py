@@ -2,7 +2,9 @@
 import argparse
 import configparser
 import csv
+import enum
 import io
+import importlib.resources
 import itertools
 import json
 import multiprocessing
@@ -21,151 +23,21 @@ import grocery_scanner.core
 import grocery_scanner.models
 import grocery_scanner.services
 
-_CSS_TEXT = """
-body {
-  max-width:767px;
-  margin:40px auto;
-  padding:0 10px;
-  font:18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  color:#444
-}
-h1,
-h2,
-h3 {
-  line-height:1.2
-}
-@media (prefers-color-scheme: dark) {
-  body {
-    color:#c9d1d9;
-    background:#0d1117
-  }
-  a:link {
-    color:#58a6ff
-  }
-  a:visited {
-    color:#8e96f0
-  }
-}
-"""
 
-HOME_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <div>
-        If you are reading this, you're now able to access Carvell's
-        random experiments by hostname instead of by ip address.
-        And there are no cache issues.
-    </div>
-    <h2>Important Links</h2>
-    <ul>
-    <li><a href="/logwatch"> logwatch </a>
-    <li><a href="/cart"> cart </a>
+class _HTMLTemplateEnum(enum.Enum):
+    HOME_PAGE = "grocery_scanner/data/home.html"
+    ITEM_PAGE = "grocery_scanner/data/item.html"
+    LOGWATCH_PAGE = "grocery_scanner/data/logwatch.html"
+    CART_PAGE = "grocery_scanner/data/cart.html"
+    STYLES_CSS = "grocery_scanner/data/styles.css"
 
-    <li><a href="/grocery_list.md"</a>
-    <li><a href="/nfc.csv">Downloadable .csv to write NFC tags in bulk</a>
-    <li><a href="/config.ini">config.ini (prob shouldn't expose this)</a>
-    <table>
-        <tr>
-            <th></th>
-            <th>Item</th>
-            <th>Link</th>
-        </tr>
-        % for item in items:
-            <tr>
-                <td><input type="checkbox"></td>
-                <td>
-                    <a href="/items/{{item.reference}}">{{item.name}}</a>
-                </td>
-                <td>
-                    <a href={{item.url}}>Shop Online</a>
-                </td>
-            </tr>
-        % end
-    </table>
-</body>
-</html>
-"""
+    def __call__(self):
+        data = None
+        path = pathlib.Path(self.value)
+        with importlib.resources.as_file(path) as f:
+            data = f.open("rb").read()
+        return data
 
-
-ITEM_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <div>
-        Pretend that this is a page for {{item.name}}.
-    </div>
-    <form action="/cart/{{item.reference}}">
-        <input type="number" id="quantity" name="quantity">
-        <input type="submit" value="Add to cart">
-    </form>
-    <ul>
-        <li>
-            <a href="/items/{{item.reference}}?action=request"> Request </a>
-        </li>
-        <li>
-            <a href="/nfc/items/{{item.reference}}"> Test NFC Redirect </a>
-        </li>
-        <li>
-            <a href="{{item.url}}"> Shop Online</a>
-    </ul>
-</body>
-</html>
-"""
-
-LOGWATCH_PAGE = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <script>
-            var es = new EventSource("logstream");
-            es.onmessage = function(e) {
-                document.getElementById("log").innerHTML = e.data;
-            }
-        </script>
-    </head>
-    <body>
-        <pre id="log">No events yet.</pre>
-    </body>
-</html>
-"""
-
-CART_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <h1>Cart</h1>
-    <table>
-        <tr>
-            <th>Item</th>
-            <th>URL</th>
-        </tr>
-        % for item, quantity in cart.items():
-            <tr>
-                <td>
-                    {{quantity}} x <a href="/items/{{item.reference}}">{{item.name}}</a>
-                </td>
-                <td>
-                    <a href={{item.url}} target="_blank">Shop Online</a>
-                </td>
-            </tr>
-        % end
-    </table>
-</body>
-</html>
-"""
 
 class ServerProcess(multiprocessing.Process):
     def __init__(self, app, host, port):
@@ -211,13 +83,13 @@ class DB2WebAdapter:
                 return "pretend the item was fulfilled."
 
 
-        template = bottle.SimpleTemplate(ITEM_PAGE)
+        template = bottle.SimpleTemplate(_HTMLTemplateEnum.ITEM_PAGE())
         return template.render(item=item)
 
     def home_page(self):
         db = self._db
         item_list = [db[key] for key in db.keys()]
-        template = bottle.SimpleTemplate(HOME_PAGE)
+        template = bottle.SimpleTemplate(_HTMLTemplateEnum.HOME_PAGE())
         return template.render(items=item_list)
 
     def nfc_csv(self):
@@ -248,7 +120,8 @@ class DB2WebAdapter:
 
     def style(self):
         bottle.response.content_type = 'text/css; charset=UTF8'
-        return _CSS_TEXT
+        path = pathlib.Path("grocery_scanner/data/styles.css")
+        return _HTMLTemplateEnum.STYLES_CSS()
 
     def markdown_grocery_list(self):
         """
@@ -266,7 +139,7 @@ class DB2WebAdapter:
         return items_str
 
     def logwatch(self):
-        return bottle.SimpleTemplate(LOGWATCH_PAGE).render()
+        return bottle.SimpleTemplate(_HTMLTemplateEnum.LOGWATCH_PAGE()).render()
 
     def logstream(self):
         db = self._db
@@ -284,7 +157,7 @@ class DB2WebAdapter:
         secret = self._secret
         cookie_cart = bottle.request.get_cookie("cart", secret=secret) or dict()
         cart = {db.load(key): quantity for key, quantity in cookie_cart.items()}
-        template = bottle.SimpleTemplate(CART_PAGE)
+        template = bottle.SimpleTemplate(_HTMLTemplateEnum.CART_PAGE())
         return template.render(cart=cart)
 
     def get_config(self):
