@@ -15,7 +15,6 @@ import sys
 import time
 import uuid
 import webbrowser
-import xml.etree.ElementTree as ET
 
 import bottle
 
@@ -173,19 +172,27 @@ class DB2WebAdapter:
         return strio.getvalue()
 
 
-def read_items_from_markdown(markdown_filename):
+def read_items_from_markdown_str(raw_str):
+    """
+    Reads grocery items from a markdown-formatted list. The format is similar
+    to how you'd create a checkbox in Obsidian:
+    - [ ] [Item Name](https://item.url)
+    """
     identity_regex = re.compile(r"- \[[ x]\] ?\[(.*)\]\((.*)\)")
+    for i, line in enumerate(raw_str.splitlines()):
+        regex_match = identity_regex.search(line)
+        if not regex_match:
+            continue
+        if regex_match:
+            name, url = regex_match.groups()
+        reference = f"{i:03}"
+        item = grocery_scanner.models.GroceryItem(reference, name, url)
+        yield item
+
+
+def read_items_from_markdown(markdown_filename):
     with open(markdown_filename, "r") as f:
-        raw_data = f.read()
-        for i, line in enumerate(raw_data.splitlines()):
-            regex_match = identity_regex.search(line)
-            if not regex_match:
-                continue
-            if regex_match:
-                name, url = regex_match.groups()
-            reference = f"{i:03}"
-            item = grocery_scanner.models.GroceryItem(reference, name, url)
-            yield item
+        return read_items_from_markdown_str(f.read())
 
 
 def main():
@@ -193,13 +200,14 @@ def main():
 
     config = configparser.ConfigParser()
     config.read(args.config_file)
+    grocery_list_path = config.get("DEFAULT", "grocery_list_path")
 
     # I want the grocery data to be readable from some simple format. Not sure
     # if markdown or .csv would be easiest. Should probably support both.
     cls = grocery_scanner.models.GroceryItem
-    csv_db = grocery_scanner.core.CSVRepository(cls, "data.csv")
+    csv_db = grocery_scanner.core.CSVRepository(cls)
 
-    for item in read_items_from_markdown("grocery_list.md"):
+    for item in read_items_from_markdown(grocery_list_path):
         csv_db.save(item)
 
     app = bottle.Bottle()
@@ -218,11 +226,13 @@ def main():
     app.route("/config.ini", ["GET"], api.get_config)
 
     server_start_time = time.perf_counter()
-    server_proc = ServerProcess(app, host="0.0.0.0", port=8080)
+    host = "0.0.0.0"
+    port = 8080
+    server_proc = ServerProcess(app, host=host, port=port)
     server_proc.start()
     print(f"Server started in {time.perf_counter() - server_start_time}")
     browser_start_time = time.perf_counter()
-    #webbrowser.open("http://localhost:8080")
+    webbrowser.open(f"http://{host}:{port}")
     print(f"Browser started in {time.perf_counter() - browser_start_time}")
 
     while True:

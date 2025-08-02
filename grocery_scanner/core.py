@@ -18,8 +18,7 @@ class AbstractRepository(typing.Protocol):
 
 
 class CSVRepository(AbstractRepository):
-    def __init__(self, cls, filename):
-        self._csv_filename = filename
+    def __init__(self, cls):
         self._data = dict()
         self._cls = cls
 
