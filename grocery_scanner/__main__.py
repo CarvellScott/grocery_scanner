@@ -114,7 +114,11 @@ class DB2WebAdapter:
         )
 
     def nfc_tag_redirect(self, redirect_url):
-        #return f"Redirecting you to {redirect_url}"
+        """
+        Redirect to whatever url is supplied. Arbitrary redirects are
+        technically a vulnerability, but given the self-hosted service, not
+        really a threat.
+        """
         return bottle.redirect(redirect_url)
 
     def style(self):
@@ -171,12 +175,33 @@ class DB2WebAdapter:
         bottle.response.content_type = 'text/plain; charset=UTF8'
         return strio.getvalue()
 
+    def make_app(self):
+        """
+        Creates a bottle.Bottle instance, assigns routes to it and returns it.
+        """
+        # The goal is for the entire API to be accessible via NFC tags/QR codes.
+        # Therefore, most resources need to be accessible with GET
+        app = bottle.Bottle()
+        app.route("/", ["GET"], self.home_page)
+        app.route("/items/<reference>", ["GET"], self.individual_item)
+        app.route("/grocery_list.md", ["GET"], self.markdown_grocery_list)
+        app.route("/nfc.csv", ["GET"], self.nfc_csv)
+        app.route("/nfc<redirect_url:path>", ["GET"], self.nfc_tag_redirect)
+        app.route("/styles.css", ["GET"], self.style)
+        app.route("/logwatch", ["GET"], self.logwatch)
+        app.route("/logstream", ["GET"], self.logstream)
+        app.route("/cart", ["GET"], self.cart)
+        app.route("/config.ini", ["GET"], self.get_config)
+        return app
+
 
 def read_items_from_markdown_str(raw_str):
     """
     Reads grocery items from a markdown-formatted list. The format is similar
     to how you'd create a checkbox in Obsidian:
-    - [ ] [Item Name](https://item.url)
+    >>> item_format = "- [ ] [Item Name](https://item.url)"
+    >>> item = next(read_items_from_markdown_str(item_format))
+    >>> assert item.name == "Item Name"
     """
     identity_regex = re.compile(r"- \[[ x]\] ?\[(.*)\]\((.*)\)")
     for i, line in enumerate(raw_str.splitlines()):
