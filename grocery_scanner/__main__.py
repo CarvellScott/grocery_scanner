@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import configparser
+import doctest
 import csv
 import enum
 import io
@@ -58,6 +59,20 @@ def get_args():
         required=not os.getenv("GROCERY_SCANNER_CONFIG"),
         default=os.getenv("GROCERY_SCANNER_CONFIG")
     )
+    parser.add_argument(
+        "-a",
+        "--address",
+        type=str,
+        default="0.0.0.0"
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=8080
+    )
+
+
     args = parser.parse_args()
     return args
 
@@ -210,14 +225,10 @@ def read_items_from_markdown_str(raw_str):
             continue
         if regex_match:
             name, url = regex_match.groups()
-        reference = f"{i:03}"
+        referential_name = name.lower()
+        reference = re.sub(r"[^a-zA-Z0-9]", "_", referential_name)
         item = grocery_scanner.models.GroceryItem(reference, name, url)
         yield item
-
-
-def read_items_from_markdown(markdown_filename):
-    with open(markdown_filename, "r") as f:
-        return read_items_from_markdown_str(f.read())
 
 
 def main():
@@ -232,32 +243,19 @@ def main():
     cls = grocery_scanner.models.GroceryItem
     csv_db = grocery_scanner.core.CSVRepository(cls)
 
-    for item in read_items_from_markdown(grocery_list_path):
-        csv_db.save(item)
+    with open(grocery_list_path, "r") as f:
+        for item in read_items_from_markdown_str(f.read()):
+            csv_db.save(item)
 
-    app = bottle.Bottle()
     api = DB2WebAdapter(csv_db)
-    # The goal is for the entire API to be accessible via NFC tags/QR codes.
-    # Therefore, most resources need to be accessible with GET
-    app.route("/", ["GET"], api.home_page)
-    app.route("/items/<reference>", ["GET"], api.individual_item)
-    app.route("/grocery_list.md", ["GET"], api.markdown_grocery_list)
-    app.route("/nfc.csv", ["GET"], api.nfc_csv)
-    app.route("/nfc<redirect_url:path>", ["GET"], api.nfc_tag_redirect)
-    app.route("/styles.css", ["GET"], api.style)
-    app.route("/logwatch", ["GET"], api.logwatch)
-    app.route("/logstream", ["GET"], api.logstream)
-    app.route("/cart", ["GET"], api.cart)
-    app.route("/config.ini", ["GET"], api.get_config)
+    app = api.make_app()
 
     server_start_time = time.perf_counter()
-    host = "0.0.0.0"
-    port = 8080
-    server_proc = ServerProcess(app, host=host, port=port)
+    server_proc = ServerProcess(app, host=args.address, port=args.port)
     server_proc.start()
     print(f"Server started in {time.perf_counter() - server_start_time}")
     browser_start_time = time.perf_counter()
-    webbrowser.open(f"http://{host}:{port}")
+    webbrowser.open(f"http://{args.address}:{args.port}")
     print(f"Browser started in {time.perf_counter() - browser_start_time}")
 
     while True:
