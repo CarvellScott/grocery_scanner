@@ -12,6 +12,7 @@ import multiprocessing
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import time
 import uuid
@@ -160,12 +161,12 @@ class DB2WebAdapter:
         return bottle.SimpleTemplate(_HTMLTemplateEnum.LOGWATCH_PAGE()).render()
 
     def logstream(self):
-        db = self._db
-        item_list = [db[key] for key in db.keys()]
         bottle.response.content_type = "text/event-stream"
         bottle.response.cache_control = "no-cache"
-        # Placeholder data
-        raw_data = [f"data: {item.name}\n" for item in item_list]
+        command = ["top", "-b", "-n", "1", "-p", str(os.getpid())]
+        data = subprocess.check_output(command, universal_newlines=True)
+
+        raw_data = [f"data: {_}\n" for _ in data.splitlines()]
         data = "".join(raw_data)
         data += "\n"
         yield data
@@ -253,13 +254,14 @@ def main():
     server_start_time = time.perf_counter()
     server_proc = ServerProcess(app, host=args.address, port=args.port)
     server_proc.start()
-    print(f"Server started in {time.perf_counter() - server_start_time}")
+    print(f"Server started in {time.perf_counter() - server_start_time}",
+          file=sys.stderr)
     browser_start_time = time.perf_counter()
     webbrowser.open(f"http://{args.address}:{args.port}")
-    print(f"Browser started in {time.perf_counter() - browser_start_time}")
+    print(f"Browser started in {time.perf_counter() - browser_start_time}",
+          file=sys.stderr)
 
-    while True:
-        pass
+    input("Press enter to terminate the server")
     server_proc.terminate()
 
 
