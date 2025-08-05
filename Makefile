@@ -1,10 +1,14 @@
-.PHONY: clean clean-build
+.PHONY: clean clean-build clean-pyc
 SERVER_EXECUTABLE=grocery-scanner-server.pyz
 
-clean: clean-build
-
-clean-build:
+clean-build: # Clean directory used to build the executable.
 	rm -rf build/
+
+clean-pyc: # Remove python file artifacts
+	find . -type d -name '__pycache__' -exec rm -rf {} +
+	find . -type f -name '*.py[co]' -exec rm -f {} +
+
+clean: clean-build clean-pyc # Clean build directory, python artifacts, EVERYTHING.
 
 build: requirements.txt ## Install dependencies to build directory
 	rm -f $(SERVER_EXECUTABLE)
