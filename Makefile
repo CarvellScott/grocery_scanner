@@ -23,5 +23,8 @@ $(SERVER_EXECUTABLE): build grocery_scanner/* ## Make the executable
 run: $(SERVER_EXECUTABLE) grocery-scanner.ini ## Run the server
 	./grocery-scanner.ini
 
+test: # Run all tests. Might be broken up into unit, integration and end-to-end tests some day.
+	python3 -m unittest discover tests
+
 help: ## You are here
 	    @grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
