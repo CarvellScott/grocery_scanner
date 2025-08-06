@@ -26,11 +26,11 @@ import grocery_scanner.services
 
 
 class _HTMLTemplateEnum(enum.Enum):
-    HOME_PAGE = "grocery_scanner/data/home.html"
-    ITEM_PAGE = "grocery_scanner/data/item.html"
-    LOGWATCH_PAGE = "grocery_scanner/data/logwatch.html"
-    CART_PAGE = "grocery_scanner/data/cart.html"
-    STYLES_CSS = "grocery_scanner/data/styles.css"
+    HOME_PAGE = "grocery_scanner/static/home.html"
+    ITEM_PAGE = "grocery_scanner/static/item.html"
+    LOGWATCH_PAGE = "grocery_scanner/static/logwatch.html"
+    CART_PAGE = "grocery_scanner/static/cart.html"
+    STYLES_CSS = "grocery_scanner/static/styles.css"
 
     def __call__(self):
         data = None
@@ -139,7 +139,6 @@ class DB2WebAdapter:
 
     def style(self):
         bottle.response.content_type = 'text/css; charset=UTF8'
-        path = pathlib.Path("grocery_scanner/data/styles.css")
         return _HTMLTemplateEnum.STYLES_CSS()
 
     def markdown_grocery_list(self):
