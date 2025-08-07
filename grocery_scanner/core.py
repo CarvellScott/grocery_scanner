@@ -2,9 +2,12 @@
 import abc
 import csv
 import dataclasses
-import shelve
 import hashlib
+import os
+import shelve
+import sqlite3
 import typing
+
 
 class AbstractRepository(typing.Protocol):
     def save(self, obj):
@@ -104,6 +107,62 @@ class Repository(ShelveRepository):
 
     def load(self, reference):
         return super().load(reference)
+
+
+INIT_SCRIPT = """
+CREATE TABLE IF NOT EXISTS "grocery_item"(
+  "reference" TEXT,
+  "name" TEXT,
+  "url" TEXT
+);
+"""
+
+def row_factory(cursor, row):
+    fields = (_[0] for _ in cursor.description)
+    return dict(zip(fields, row))
+
+
+class DBWrapper:
+    def __init__(self):
+        db = sqlite3.connect(os.environ.get("DB_URL") or ":memory:")
+        db.row_factory = row_factory
+        self._db = db
+
+    def init_db(self):
+        db = self._db
+        with db:
+            db.executescript(INIT_SCRIPT)
+
+    def _generic_insert(self, dataclass_instance):
+        fields = dataclasses.fields(dataclass_instance)
+        names = [_.name for _ in fields]
+        obj_dict = dataclasses.asdict(dataclass_instance)
+
+    def upsert_item(self, grocery_item):
+        with self._db:
+            db_cmd = "INSERT OR REPLACE INTO grocery_item (reference, name, url) VALUES (?, ?, ?)"
+            values = (grocery_item.reference, grocery_item.name, grocery_item.url)
+            self._db.execute(db_cmd, values)
+
+    def get_item(self, reference):
+        """
+        >>> from grocery_scanner.models import GroceryItem
+        >>> db = DBWrapper()
+        >>> db.init_db()
+        >>> expected_item = GroceryItem("test_item", "Test Item", "about:blank")
+        >>> db.upsert_item(expected_item)
+        >>> actual_item = db.get_item("test_item")
+        >>> assert dataclasses.asdict(expected_item) == actual_item, actual_item
+        """
+        db_cmd = "SELECT * FROM grocery_item WHERE reference = ?"
+        cur = self._db.execute(db_cmd, (reference,))
+        row = cur.fetchone()
+        if row:
+            return dict(row)
+        raise KeyError(reference)
+
+    def dump(self):
+        print("\n".join(self.db.iterdump()))
 
 
 def main():
