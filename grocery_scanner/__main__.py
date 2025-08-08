@@ -54,25 +54,22 @@ class ServerProcess(multiprocessing.Process):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-c",
-        "--config-file",
+        "grocery_definitions",
         type=pathlib.Path,
-        required=not os.getenv("GROCERY_SCANNER_CONFIG"),
-        default=os.getenv("GROCERY_SCANNER_CONFIG")
+        help="A .md or .ini file containing grocery definitions."
     )
     parser.add_argument(
         "-a",
         "--address",
         type=str,
-        default="0.0.0.0"
+        default=os.getenv("GROCERY_SCANNER_ADDRESS") or "0.0.0.0"
     )
     parser.add_argument(
         "-p",
         "--port",
         type=int,
-        default=8080
+        default=os.getenv("GROCERY_SCANNER_PORT") or 8080
     )
-
 
     args = parser.parse_args()
     return args
@@ -234,18 +231,26 @@ def read_items_from_markdown_str(raw_str):
 def main():
     args = get_args()
 
-    config = configparser.ConfigParser()
-    config.read(args.config_file)
-    grocery_list_path = config.get("DEFAULT", "grocery_list_path")
-
-    # I want the grocery data to be readable from some simple format. Not sure
-    # if markdown or .csv would be easiest. Should probably support both.
     cls = grocery_scanner.models.GroceryItem
     csv_db = grocery_scanner.core.CSVRepository(cls)
 
-    with open(grocery_list_path, "r") as f:
-        for item in read_items_from_markdown_str(f.read()):
+    # I want the grocery data to be readable from some simple format.
+    # I want it to be borderline trivial to write but still extendable later.
+    # Since configparser's format supports comments I opted for that.
+    # May revisit supporting markdown in the future or .csv
+    if args.grocery_definitions.suffix == ".ini":
+        grocery_defs = configparser.ConfigParser()
+        grocery_defs.read(args.grocery_definitions)
+
+        for section in grocery_defs.sections():
+            raw_item = dict(grocery_defs.items(section))
+            item = grocery_scanner.models.GroceryItem(**raw_item)
             csv_db.save(item)
+
+    if args.grocery_definitions.suffix == ".md":
+        with open(args.grocery_definitions, "r") as f:
+            for item in read_items_from_markdown_str(f.read()):
+                csv_db.save(item)
 
     api = DB2WebAdapter(csv_db)
     app = api.make_app()
@@ -256,7 +261,8 @@ def main():
     print(f"Server started in {time.perf_counter() - server_start_time}",
           file=sys.stderr)
     browser_start_time = time.perf_counter()
-    webbrowser.open(f"http://{args.address}:{args.port}")
+    if os.environ.get("BROWSER"):
+        webbrowser.open(f"http://{args.address}:{args.port}")
     print(f"Browser started in {time.perf_counter() - browser_start_time}",
           file=sys.stderr)
 
