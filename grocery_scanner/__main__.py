@@ -26,19 +26,19 @@ import grocery_scanner.services
 
 
 class _HTMLTemplateEnum(enum.Enum):
-    HOME_PAGE = "grocery_scanner/static/home.html"
-    ITEM_PAGE = "grocery_scanner/static/item.html"
-    LOGWATCH_PAGE = "grocery_scanner/static/logwatch.html"
-    CART_PAGE = "grocery_scanner/static/cart.html"
-    STYLES_CSS = "grocery_scanner/static/styles.css"
+    HOME_PAGE = "static/home.html"
+    ITEM_PAGE = "static/item.html"
+    LOGWATCH_PAGE = "static/logwatch.html"
+    CART_PAGE = "static/cart.html"
+    STYLES_CSS = "static/styles.css"
 
     def __call__(self):
         data = None
         path = pathlib.Path(self.value)
-        with importlib.resources.as_file(path) as f:
-            data = f.open("rb").read()
-        return data
 
+        files = importlib.resources.files("grocery_scanner")
+        path = files.joinpath(self.value)
+        return path.read_bytes()
 
 class ServerProcess(multiprocessing.Process):
     def __init__(self, app, host, port):
@@ -187,6 +187,12 @@ class DB2WebAdapter:
         bottle.response.content_type = 'text/plain; charset=UTF8'
         return strio.getvalue()
 
+    def get_executable(self):
+        path = pathlib.Path(sys.argv[0]).absolute()
+        bottle.response.content_type = 'application/zip'
+        with open(path, "rb") as f:
+            return f.read()
+
     def make_app(self):
         """
         Creates a bottle.Bottle instance, assigns routes to it and returns it.
@@ -204,6 +210,7 @@ class DB2WebAdapter:
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/cart", ["GET"], self.cart)
         app.route("/config.ini", ["GET"], self.get_config)
+        app.route("/grocery-scanner-server.pyz", ["GET"], self.get_executable)
         return app
 
 
@@ -230,7 +237,6 @@ def read_items_from_markdown_str(raw_str):
 
 def main():
     args = get_args()
-
     cls = grocery_scanner.models.GroceryItem
     csv_db = grocery_scanner.core.CSVRepository(cls)
 
