@@ -8,7 +8,7 @@ license = {file = "LICENSE"}
 keywords = []
 authors = [{name = "Carvell", email = "carvell.scott@gmail.com"}]
 maintainers = [{name = "Carvell", email = "carvell.scott@gmail.com"}]
-dependencies = ["bottle==0.13.2"]
+dependencies = ["bottle==0.13.4"]
 # Dependencies format can be generated from requirements.txt with:
 # python3 -c 'print([_.strip() for _ in open("requirements.txt", "r").readlines()])'
 
