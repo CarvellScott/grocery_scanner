@@ -29,6 +29,5 @@ cli = "grocery_scanner:main"
 requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["grocery_scanner"]
-package-dir = {}
+[tool.setuptools.package-data]
+grocery_scanner = ["static/*"]
