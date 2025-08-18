@@ -7,9 +7,12 @@ clean-pyc: ## Remove python file artifacts
 
 clean: clean-pyc ## Clean build directory, python artifacts, EVERYTHING.
 
-$(SERVER_EXECUTABLE): pyproject.toml grocery_scanner/* ## Make the executable
+pip: ## Download a standalone zipapp of pip to avoid whatever shenanigans with system-wide pip
+	curl 'https://bootstrap.pypa.io/pip/pip.pyz' -o pip
+
+$(SERVER_EXECUTABLE): pip pyproject.toml grocery_scanner/* ## Make the executable
 	mkdir -p build/
-	pip install -U -t build/ .
+	python3 pip install -U -t build/ .
 	mv build/bin/cli build/__main__.py
 	python3 -m zipapp --compress -p '/usr/bin/env python3' --output $(SERVER_EXECUTABLE) build/
 
