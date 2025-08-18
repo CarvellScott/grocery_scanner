@@ -76,12 +76,14 @@ def get_args():
 
 
 class DB2WebAdapter:
-    def __init__(self, db):
-        self._db = db
+    def __init__(self, repo):
+        self._repo = repo
         self._secret = str(uuid.uuid4())
 
     def individual_item(self, reference):
-        item = self._db.load(reference)
+        # TODO: Replace this with something that doesn't require the user to
+        # take action.
+        item = self._repo.load(reference)
         secret = self._secret
         cart = bottle.request.get_cookie("cart", secret=secret) or dict()
         action = bottle.request.params.get("action")
@@ -99,8 +101,8 @@ class DB2WebAdapter:
         return template.render(item=item)
 
     def home_page(self):
-        db = self._db
-        item_list = [db[key] for key in db.keys()]
+        repo = self._repo
+        item_list = [repo[key] for key in repo.keys()]
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.HOME_PAGE())
         return template.render(items=item_list)
 
@@ -108,8 +110,8 @@ class DB2WebAdapter:
         """
         Produce a .csv file of URLS compatible with NXP Tag Writer
         """
-        db = self._db
-        item_list = [db[key] for key in db.keys()]
+        repo = self._repo
+        item_list = [repo[key] for key in repo.keys()]
 
         urlparts = bottle.request.urlparts
         scheme = urlparts.scheme
@@ -143,8 +145,8 @@ class DB2WebAdapter:
         Produce a markdown-formatted grocery list, ideal for importing into
         Obsidian
         """
-        db = self._db
-        item_list = [db[key] for key in db.keys()]
+        repo = self._repo
+        item_list = [repo[key] for key in repo.keys()]
         bottle.response.content_type = 'text/plain; charset=UTF8'
         formatter = "- [ ] [{name}]({url})".format
         lines = []
@@ -168,16 +170,16 @@ class DB2WebAdapter:
         yield data
 
     def cart(self):
-        db = self._db
+        repo = self._repo
         secret = self._secret
         cookie_cart = bottle.request.get_cookie("cart", secret=secret) or dict()
-        cart = {db.load(key): quantity for key, quantity in cookie_cart.items()}
+        cart = {repo.load(key): quantity for key, quantity in cookie_cart.items()}
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.CART_PAGE())
         return template.render(cart=cart)
 
     def get_config(self):
-        db = self._db
-        item_list = [db[key] for key in db.keys()]
+        repo = self._repo
+        item_list = [repo[key] for key in repo.keys()]
         config = configparser.ConfigParser()
         strio = io.StringIO()
         for item in item_list:
@@ -238,7 +240,7 @@ def read_items_from_markdown_str(raw_str):
 def main():
     args = get_args()
     cls = grocery_scanner.models.GroceryItem
-    csv_db = grocery_scanner.core.CSVRepository(cls)
+    item_repo = grocery_scanner.core.CSVRepository(cls)
 
     # I want the grocery data to be readable from some simple format.
     # I want it to be borderline trivial to write but still extendable later.
@@ -251,14 +253,14 @@ def main():
         for section in grocery_defs.sections():
             raw_item = dict(grocery_defs.items(section))
             item = grocery_scanner.models.GroceryItem(**raw_item)
-            csv_db.save(item)
+            item_repo.save(item)
 
     if args.grocery_definitions.suffix == ".md":
         with open(args.grocery_definitions, "r") as f:
             for item in read_items_from_markdown_str(f.read()):
-                csv_db.save(item)
+                item_repo.save(item)
 
-    api = DB2WebAdapter(csv_db)
+    api = DB2WebAdapter(item_repo)
     app = api.make_app()
 
     server_start_time = time.perf_counter()

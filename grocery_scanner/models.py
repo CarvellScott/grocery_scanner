@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import dataclasses
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass(frozen=True)
 class _GroceryItem:
     reference: str
     name: str
