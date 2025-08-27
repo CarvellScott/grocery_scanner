@@ -22,7 +22,7 @@ import bottle
 
 import grocery_scanner.core
 import grocery_scanner.models
-import grocery_scanner.services
+import grocery_scanner.utils
 
 
 class _HTMLTemplateEnum(enum.Enum):
@@ -124,7 +124,7 @@ class DB2WebAdapter:
 
         #bottle.response.content_type = 'text/plain; charset=UTF8'
         bottle.response.content_type = 'text/csv; charset=UTF8'
-        return grocery_scanner.services.nfc_file_from_repo(
+        return grocery_scanner.utils.nfc_file_from_repo(
             nfc_item_list
         )
 
