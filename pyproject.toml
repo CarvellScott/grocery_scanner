@@ -23,7 +23,7 @@ Repository = "https://127.0.0.1/PROJECT_PLACEHOLDER.git"
 Changelog = "https://127.0.0.1/CHANGELOG.md"
 
 [project.scripts]
-cli = "grocery_scanner:main"
+grocery-scanner-web = "grocery_scanner.bottle_entrypoint:main"
 
 [build-system]
 requires = ["setuptools >= 61.0.0"]
