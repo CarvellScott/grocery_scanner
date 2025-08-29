@@ -29,5 +29,8 @@ grocery-scanner-web = "grocery_scanner.bottle_entrypoint:main"
 requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["grocery_scanner"]
+
 [tool.setuptools.package-data]
 grocery_scanner = ["static/*"]

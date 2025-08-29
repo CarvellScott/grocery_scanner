@@ -8,18 +8,19 @@ clean-pyc: ## Remove python file artifacts
 	find . -type d -name '__pycache__' -exec rm -rf {} +
 	find . -type f -name '*.py[co]' -exec rm -f {} +
 
-clean: clean-pyc ## Clean build directory, python artifacts, EVERYTHING.
-	rm -r build/
+clean-pyz:
+	rm -r pyz_build
 	rm $(SERVER_EXECUTABLE)
+
+clean: clean-pyc clean-pyz ## Clean build directory, python artifacts, EVERYTHING.
 
 pip: ## Download a standalone zipapp of pip to avoid whatever shenanigans with system-wide pip
 	curl 'https://bootstrap.pypa.io/pip/pip.pyz' -o pip
 
 $(SERVER_EXECUTABLE): pip pyproject.toml grocery_scanner/* ## Make the executable
-	mkdir -p build/
-	python3 pip install -U -t build/ .
-	mv build/bin/grocery-scanner-web build/__main__.py
-	python3 -m zipapp --compress -p '/usr/bin/env python3' --output $(SERVER_EXECUTABLE) build/
+	python3 pip install -t pyz_build/ .
+	mv pyz_build/bin/grocery-scanner-web pyz_build/__main__.py
+	python3 -m zipapp --compress -p '/usr/bin/env python3' --output $(SERVER_EXECUTABLE) pyz_build/
 
 run: $(SERVER_EXECUTABLE) grocery-scanner.ini ## Run the server
 	./grocery-scanner.ini
