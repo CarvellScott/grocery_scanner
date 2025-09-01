@@ -2,11 +2,15 @@
 import dataclasses
 from datetime import datetime
 
-@dataclasses.dataclass(frozen=True)
+_NOW = datetime.now()
+
+@dataclasses.dataclass(unsafe_hash=True)
 class GroceryItem:
-    reference: str
-    name: str
-    url: str
+    reference: str = dataclasses.field(hash=True)
+    name: str = dataclasses.field(compare=False)
+    url: dataclasses.field(compare=False)
+    last_emptied: datetime = dataclasses.field(compare=False, default=_NOW)
+
 
 @dataclasses.dataclass
 class ItemContainer:

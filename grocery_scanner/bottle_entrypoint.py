@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import configparser
+import datetime
 import enum
 import importlib.resources
 import io
@@ -37,11 +38,14 @@ class _HTMLTemplateEnum(enum.Enum):
 class BottleAdapter:
     def __init__(self, repo):
         self._repo = repo
+        self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
 
+    def mark_item_requested(self, reference):
+        grocery_scanner.services.mark_item_requested(self._repo, reference)
+        return bottle.redirect("/")
+
     def individual_item(self, reference):
-        # TODO: Replace this with something that doesn't require the user to
-        # take action.
         item = self._repo.load(reference)
         secret = self._secret
         cart = bottle.request.get_cookie("cart", secret=secret) or dict()
@@ -62,22 +66,36 @@ class BottleAdapter:
     def home_page(self):
         repo = self._repo
         item_list = [repo[key] for key in repo.keys()]
+        item_dct_list = []
+        for item in item_list:
+            if item.last_emptied < self._start_time:
+                status = "OK"
+            else:
+                status = "Requested"
+            entry = [
+                item.reference,
+                item.name,
+                item.url,
+                status
+            ]
+            item_dct_list.append(entry)
+
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.HOME_PAGE())
-        return template.render(items=item_list)
+        return template.render(items=item_dct_list)
 
     def nfc_csv(self):
         """
         Produce a .csv file of URLS compatible with NXP Tag Writer
         """
-
         urlparts = bottle.request.urlparts
         scheme = urlparts.scheme
         netloc = urlparts.netloc
         url_prefix = f"{scheme}://{netloc}/nfc/items"
 
-        file_data = generate_nfc_csv_from_repo(self._repo, url_prefix)
-        #bottle.response.content_type = 'text/plain; charset=UTF8'
-        bottle.response.content_type = 'text/csv; charset=UTF8'
+        file_data = grocery_scanner.services.generate_nfc_csv_from_repo(self._repo, url_prefix)
+        # Would use text/csv for MIME type, but browsers insist on turning it
+        # into an automatic download, even with Content-Disposition = inline
+        bottle.response.content_type = 'text/plain; charset=UTF8'
         return file_data
 
     def nfc_tag_redirect(self, redirect_url):
@@ -97,18 +115,19 @@ class BottleAdapter:
         Produce a markdown-formatted grocery list, ideal for importing into
         Obsidian
         """
-        return generate_markdown_item_list(self._repo)
+        bottle.response.content_type = 'text/plain; charset=UTF8'
+        return grocery_scanner.services.generate_markdown_item_list(self._repo)
 
     def logwatch(self):
         return bottle.SimpleTemplate(_HTMLTemplateEnum.LOGWATCH_PAGE()).render()
 
     def logstream(self):
-        bottle.response.content_type = "text/event-stream"
-        bottle.response.cache_control = "no-cache"
         command = ["top", "-b", "-n", "1", "-p", str(os.getpid())]
         data = subprocess.check_output(command, universal_newlines=True)
 
-        raw_data = [f"data: {_}\n" for _ in data.splitlines()]
+        bottle.response.content_type = "text/event-stream"
+        bottle.response.cache_control = "no-cache"
+        raw_data = ["retry: 1000\n"] + [f"data: {_}\n" for _ in data.splitlines()]
         data = "".join(raw_data)
         data += "\n"
         yield data
@@ -147,7 +166,7 @@ class BottleAdapter:
         # Therefore, most resources need to be accessible with GET
         app = bottle.Bottle()
         app.route("/", ["GET"], self.home_page)
-        app.route("/items/<reference>", ["GET"], self.individual_item)
+        app.route("/items/<reference>", ["GET"], self.mark_item_requested)
         app.route("/grocery_list.md", ["GET"], self.markdown_grocery_list)
         app.route("/nfc.csv", ["GET"], self.nfc_csv)
         app.route("/nfc<redirect_url:path>", ["GET"], self.nfc_tag_redirect)
@@ -156,7 +175,7 @@ class BottleAdapter:
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/cart", ["GET"], self.cart)
         app.route("/config.ini", ["GET"], self.get_config)
-        app.route("/grocery-scanner-server.pyz", ["GET"], self.get_executable)
+        app.route("/download_server", ["GET"], self.get_executable)
         return app
 
 

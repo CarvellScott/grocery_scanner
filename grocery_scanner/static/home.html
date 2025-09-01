@@ -23,16 +23,18 @@
             <th></th>
             <th>Item</th>
             <th>Link</th>
+            <th>Status</th>
         </tr>
-        % for item in items:
+        % for item_ref, item_name, item_url, item_status in items:
             <tr>
                 <td><input type="checkbox"></td>
                 <td>
-                    <a href="/items/{{item.reference}}">{{item.name}}</a>
+                    <a href="/items/{{item_ref}}">{{item_name}}</a>
                 </td>
                 <td>
-                    <a href={{item.url}}>Shop Online</a>
+                    <a href={{item_url}}>Shop Online</a>
                 </td>
+                <td>{{item_status}}</td>
             </tr>
         % end
     </table>
