@@ -2,7 +2,7 @@
 import csv
 import io
 
-def nfc_file_from_repo(item_list):
+def make_nfc_csv_data(item_list):
     # This function converts the list of items into a format that can be used
     # with NXP Tag Writer (Android app) to write NFC tags in bulk.
     entries = list()

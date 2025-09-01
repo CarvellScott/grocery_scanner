@@ -15,7 +15,7 @@ import bottle
 
 import grocery_scanner.core
 import grocery_scanner.models
-import grocery_scanner.utils
+import grocery_scanner.services
 
 
 class _HTMLTemplateEnum(enum.Enum):
@@ -69,23 +69,16 @@ class BottleAdapter:
         """
         Produce a .csv file of URLS compatible with NXP Tag Writer
         """
-        repo = self._repo
-        item_list = [repo[key] for key in repo.keys()]
 
         urlparts = bottle.request.urlparts
         scheme = urlparts.scheme
         netloc = urlparts.netloc
-        nfc_item_list = []
-        for item in item_list:
-            url = f"{scheme}://{netloc}/nfc/items/{item.reference}"
-            name = repr(item.name)
-            nfc_item_list.append((name, url))
+        url_prefix = f"{scheme}://{netloc}/nfc/items"
 
+        file_data = generate_nfc_csv_from_repo(self._repo, url_prefix)
         #bottle.response.content_type = 'text/plain; charset=UTF8'
         bottle.response.content_type = 'text/csv; charset=UTF8'
-        return grocery_scanner.utils.nfc_file_from_repo(
-            nfc_item_list
-        )
+        return file_data
 
     def nfc_tag_redirect(self, redirect_url):
         """
@@ -104,15 +97,7 @@ class BottleAdapter:
         Produce a markdown-formatted grocery list, ideal for importing into
         Obsidian
         """
-        repo = self._repo
-        item_list = [repo[key] for key in repo.keys()]
-        bottle.response.content_type = 'text/plain; charset=UTF8'
-        formatter = "- [ ] [{name}]({url})".format
-        lines = []
-        for item in item_list:
-            lines.append(formatter(name=item.name, url=item.url))
-        items_str = "\n".join(lines)
-        return items_str
+        return generate_markdown_item_list(self._repo)
 
     def logwatch(self):
         return bottle.SimpleTemplate(_HTMLTemplateEnum.LOGWATCH_PAGE()).render()
@@ -175,27 +160,6 @@ class BottleAdapter:
         return app
 
 
-def read_items_from_markdown_str(raw_str):
-    """
-    Reads grocery items from a markdown-formatted list. The format is similar
-    to how you'd create a checkbox in Obsidian:
-    >>> item_format = "- [ ] [Item Name](https://item.url)"
-    >>> item = next(read_items_from_markdown_str(item_format))
-    >>> assert item.name == "Item Name"
-    """
-    identity_regex = re.compile(r"- \[[ x]\] ?\[(.*)\]\((.*)\)")
-    for i, line in enumerate(raw_str.splitlines()):
-        regex_match = identity_regex.search(line)
-        if not regex_match:
-            continue
-        if regex_match:
-            name, url = regex_match.groups()
-        referential_name = name.lower()
-        reference = re.sub(r"[^a-zA-Z0-9]", "_", referential_name)
-        item = grocery_scanner.models.GroceryItem(reference, name, url)
-        yield item
-
-
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -240,8 +204,7 @@ def main():
 
     if args.grocery_definitions.suffix == ".md":
         with open(args.grocery_definitions, "r") as f:
-            for item in read_items_from_markdown_str(f.read()):
-                item_repo.save(item)
+            grocery_scanner.services.add_items_from_markdown(item_repo, f.read())
 
     api = BottleAdapter(item_repo)
     app = api.make_app()
