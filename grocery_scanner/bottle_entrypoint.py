@@ -18,21 +18,21 @@ import grocery_scanner.core
 import grocery_scanner.models
 import grocery_scanner.services
 
+_ASSETS = importlib.resources.files("grocery_scanner")
+
 
 class _HTMLTemplateEnum(enum.Enum):
     HOME_PAGE = "static/home.html"
     ITEM_PAGE = "static/item.html"
     LOGWATCH_PAGE = "static/logwatch.html"
-    CART_PAGE = "static/cart.html"
     STYLES_CSS = "static/styles.css"
 
-    def __call__(self):
-        data = None
-        path = pathlib.Path(self.value)
+    def __init__(self, rel_path):
+        path = _ASSETS.joinpath(rel_path)
+        self._data = path.read_bytes()
 
-        files = importlib.resources.files("grocery_scanner")
-        path = files.joinpath(self.value)
-        return path.read_bytes()
+    def __call__(self):
+        return self._data
 
 
 class BottleAdapter:
@@ -44,24 +44,6 @@ class BottleAdapter:
     def mark_item_requested(self, reference):
         grocery_scanner.services.mark_item_requested(self._repo, reference)
         return bottle.redirect("/")
-
-    def individual_item(self, reference):
-        item = self._repo.load(reference)
-        secret = self._secret
-        cart = bottle.request.get_cookie("cart", secret=secret) or dict()
-        action = bottle.request.params.get("action")
-        match action:
-            case "request":
-                cart[item.reference] = 1
-                bottle.response.set_cookie("cart", cart, path="/", secret=secret)
-                print(cart, file=sys.stderr)
-                return bottle.redirect("/cart")
-            case "fulfill":
-                return "pretend the item was fulfilled."
-
-
-        template = bottle.SimpleTemplate(_HTMLTemplateEnum.ITEM_PAGE())
-        return template.render(item=item)
 
     def home_page(self):
         repo = self._repo
@@ -132,14 +114,6 @@ class BottleAdapter:
         data += "\n"
         yield data
 
-    def cart(self):
-        repo = self._repo
-        secret = self._secret
-        cookie_cart = bottle.request.get_cookie("cart", secret=secret) or dict()
-        cart = {repo.load(key): quantity for key, quantity in cookie_cart.items()}
-        template = bottle.SimpleTemplate(_HTMLTemplateEnum.CART_PAGE())
-        return template.render(cart=cart)
-
     def get_config(self):
         repo = self._repo
         item_list = [repo[key] for key in repo.keys()]
@@ -173,7 +147,6 @@ class BottleAdapter:
         app.route("/styles.css", ["GET"], self.style)
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
-        app.route("/cart", ["GET"], self.cart)
         app.route("/config.ini", ["GET"], self.get_config)
         app.route("/download_server", ["GET"], self.get_executable)
         return app
@@ -214,7 +187,8 @@ def main():
     # May revisit supporting markdown in the future or .csv
     if args.grocery_definitions.suffix == ".ini":
         grocery_defs = configparser.ConfigParser()
-        grocery_defs.read(args.grocery_definitions)
+        with open(args.grocery_definitions, "r") as f:
+            grocery_defs.read_string(f.read())
 
         for section in grocery_defs.sections():
             raw_item = dict(grocery_defs.items(section))
