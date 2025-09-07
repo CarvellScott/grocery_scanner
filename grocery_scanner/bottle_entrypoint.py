@@ -11,8 +11,12 @@ import re
 import subprocess
 import sys
 import uuid
+import warnings
 
-import bottle
+try:
+    import bottle
+except ModuleNotFoundError:
+    warnings.warn("bottle.py module not found.")
 
 import grocery_scanner.core
 import grocery_scanner.models
@@ -51,15 +55,11 @@ class BottleAdapter:
         item_list = [repo[key] for key in repo.keys()]
         item_dct_list = []
         for item in item_list:
-            if item.last_emptied < self._start_time:
-                status = "OK"
-            else:
-                status = "Requested"
             entry = [
                 item.reference,
                 item.name,
                 item.url,
-                status
+                item.status
             ]
             item_dct_list.append(entry)
 

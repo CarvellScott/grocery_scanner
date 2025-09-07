@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import doctest
 import re
-import datetime
 
 
 import grocery_scanner.models
@@ -9,7 +8,7 @@ import grocery_scanner.utils
 
 def mark_item_requested(repo, item_id):
     item = repo[item_id]
-    item.last_emptied = datetime.datetime.now()
+    item.status = "requested"
     repo.save(item)
 
 def generate_nfc_csv_from_repo(repo, url_prefix):
