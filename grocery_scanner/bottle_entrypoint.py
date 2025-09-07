@@ -27,12 +27,13 @@ class _HTMLTemplateEnum(enum.Enum):
     LOGWATCH_PAGE = "static/logwatch.html"
     STYLES_CSS = "static/styles.css"
 
-    def __init__(self, rel_path):
-        path = _ASSETS.joinpath(rel_path)
-        self._data = path.read_bytes()
+    def __new__(cls, value):
+        obj = object.__new__(cls)
+        obj._value_ = _ASSETS.joinpath(value).read_bytes()
+        return obj
 
     def __call__(self):
-        return self._data
+        return self.value
 
 
 class BottleAdapter:
