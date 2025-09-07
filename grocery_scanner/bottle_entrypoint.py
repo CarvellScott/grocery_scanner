@@ -170,7 +170,7 @@ def get_args():
         "-p",
         "--port",
         type=int,
-        default=os.getenv("GROCERY_SCANNER_PORT") or 8080
+        default=os.getenv("GROCERY_SCANNER_PORT") or 80
     )
 
     args = parser.parse_args()
