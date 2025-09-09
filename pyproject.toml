@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Carvell's stupid self-hosted grocery scanner app"
 readme = "README.md"
 requires-python = ">=3.7"
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
 keywords = []
 authors = [{name = "Carvell", email = "carvell.scott@gmail.com"}]
 maintainers = [{name = "Carvell", email = "carvell.scott@gmail.com"}]
@@ -17,9 +17,9 @@ gui = [] # Example: ["PyQt5"]
 cli = [] # Example: ["click"]
 
 [project.urls]
-Homepage = "https://127.0.0.1"
-Documentation = "https://127.0.0.1"
-Repository = "https://127.0.0.1/PROJECT_PLACEHOLDER.git"
+Homepage = "https://github.com/CarvellScott/grocery_scanner"
+Documentation = "https://github.com/CarvellScott/grocery_scanner/blob/main/README.md"
+Repository = "https://github.com/CarvellScott/grocery_scanner"
 Changelog = "https://127.0.0.1/CHANGELOG.md"
 
 [project.scripts]
