@@ -19,21 +19,21 @@
     <li><a href="/grocery-scanner-server.pyz">server software</a>
     <table>
         <tr>
-            <th></th>
             <th>Item</th>
             <th>Link</th>
             <th>Status</th>
         </tr>
-        % for item_ref, item_name, item_url, item_status in items:
+        % for item_ref, item_name, info_url, shop_url, item_action_url, item_action in items:
             <tr>
-                <td><input type="checkbox"></td>
                 <td>
-                    <a href="/items/{{item_ref}}">{{item_name}}</a>
+                    <a href="{{info_url}}">{{item_name}}</a>
                 </td>
                 <td>
-                    <a href={{item_url}}>Shop Online</a>
+                    <a href={{shop_url}}>Shop Online</a>
                 </td>
-                <td>{{item_status}}</td>
+                <td>
+                    <a href="{{item_action_url}}">{{item_action}}</a>
+                </td>
             </tr>
         % end
     </table>

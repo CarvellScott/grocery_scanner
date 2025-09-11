@@ -6,9 +6,12 @@ import re
 import grocery_scanner.models
 import grocery_scanner.utils
 
-def mark_item_requested(repo, item_id):
+def change_item_status(repo, item_id, action):
     item = repo[item_id]
-    item.status = "requested"
+    if action == "request":
+        item.status = "requested"
+    if action == "fulfill":
+        item.status = "OK"
     repo.save(item)
 
 def generate_nfc_csv_from_repo(repo, url_prefix):

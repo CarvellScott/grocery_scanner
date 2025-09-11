@@ -46,8 +46,9 @@ class BottleAdapter:
         self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
 
-    def mark_item_requested(self, reference):
-        grocery_scanner.services.mark_item_requested(self._repo, reference)
+    def change_item_status(self, reference):
+        action = bottle.request.params.get("action")
+        grocery_scanner.services.change_item_status(self._repo, reference, action)
         return bottle.redirect("/")
 
     def home_page(self):
@@ -55,11 +56,17 @@ class BottleAdapter:
         item_list = [repo[key] for key in repo.keys()]
         item_dct_list = []
         for item in item_list:
+            action = "request" if item.status == "OK" else "fulfill"
+            info_url = f"/items/{item.reference}"
+            shop_url = item.url
+            action_url = f"/items/{item.reference}?action={action}"
             entry = [
                 item.reference,
                 item.name,
-                item.url,
-                item.status
+                info_url,
+                shop_url,
+                action_url,
+                action.title()
             ]
             item_dct_list.append(entry)
 
@@ -141,7 +148,7 @@ class BottleAdapter:
         # Therefore, most resources need to be accessible with GET
         app = bottle.Bottle()
         app.route("/", ["GET"], self.home_page)
-        app.route("/items/<reference>", ["GET"], self.mark_item_requested)
+        app.route("/items/<reference>", ["GET"], self.change_item_status)
         app.route("/grocery_list.md", ["GET"], self.markdown_grocery_list)
         app.route("/nfc.csv", ["GET"], self.nfc_csv)
         app.route("/nfc<redirect_url:path>", ["GET"], self.nfc_tag_redirect)
