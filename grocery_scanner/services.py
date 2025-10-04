@@ -60,7 +60,7 @@ def read_items_from_markdown_str(raw_str):
         yield item
 
 def add_items_from_markdown(repo, raw_str):
-    for item in read_items_from_markdown_str():
+    for item in read_items_from_markdown_str(raw_str):
         repo.save(item)
 
 
