@@ -122,18 +122,6 @@ class BottleAdapter:
         data += "\n"
         yield data
 
-    def get_config(self):
-        repo = self._repo
-        item_list = [repo[key] for key in repo.keys()]
-        config = configparser.ConfigParser()
-        strio = io.StringIO()
-        for item in item_list:
-            config.add_section(item.reference)
-            config[item.reference] = vars(item)
-        config.write(strio)
-        bottle.response.content_type = 'text/plain; charset=UTF8'
-        return strio.getvalue()
-
     def get_executable(self):
         path = pathlib.Path(sys.argv[0]).absolute()
         bottle.response.content_type = 'application/zip'
@@ -155,7 +143,6 @@ class BottleAdapter:
         app.route("/styles.css", ["GET"], self.style)
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
-        app.route("/config.ini", ["GET"], self.get_config)
         app.route("/download_server", ["GET"], self.get_executable)
         return app
 
@@ -163,21 +150,16 @@ class BottleAdapter:
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-c",
+        "--config-filename",
+        type=pathlib.Path,
+        help="A .ini file containing configuration for bottle"
+    )
+
+    parser.add_argument(
         "grocery_definitions",
         type=pathlib.Path,
         help="A .md or .ini file containing grocery definitions."
-    )
-    parser.add_argument(
-        "-a",
-        "--address",
-        type=str,
-        default=os.getenv("GROCERY_SCANNER_ADDRESS") or "0.0.0.0"
-    )
-    parser.add_argument(
-        "-p",
-        "--port",
-        type=int,
-        default=os.getenv("GROCERY_SCANNER_PORT") or 80
     )
 
     args = parser.parse_args()
@@ -209,7 +191,10 @@ def main():
 
     api = BottleAdapter(item_repo)
     app = api.make_app()
-    bottle.run(app, host=args.address, port=args.port)
+    app.config.load_config(args.config_filename)
+    host = app.config.get("address", os.getenv("GROCERY_SCANNER_ADDRESS") or "")
+    port = app.config.get("port", os.getenv("GROCERY_SCANNER_PORT"))
+    bottle.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
