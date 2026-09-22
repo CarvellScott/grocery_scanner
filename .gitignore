@@ -1,3 +1,5 @@
 *.py[cdo]
 .*.sw?
 __pycache__/
+pip
+tags
