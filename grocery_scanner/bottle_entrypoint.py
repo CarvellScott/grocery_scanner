@@ -44,10 +44,12 @@ class _HTMLTemplateEnum(enum.Enum):
 
 
 class BottleAdapter:
-    def __init__(self, repo):
+    def __init__(self, repo, config_path):
         self._repo = repo
         self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
+        self._config_path = config_path
+        self._app = None
 
     def change_item_status(self, reference):
         action = bottle.request.params.get("action")
@@ -159,7 +161,16 @@ class BottleAdapter:
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/download_server", ["GET"], self.get_executable)
+        app.config.load_config(self._config_path)
         return app
+
+
+    def __call__(self):
+        app = self.make_app()
+        host = app.config.get("address" or "")
+        port = app.config.get("port", 80)
+        self._app = app
+        bottle.run(self._app, host=host, port=port)
 
 
 def get_args():
@@ -204,12 +215,8 @@ def main():
         with open(args.grocery_definitions, "r") as f:
             grocery_scanner.services.add_items_from_markdown(item_repo, f.read())
 
-    api = BottleAdapter(item_repo)
-    app = api.make_app()
-    app.config.load_config(args.config_filename)
-    host = app.config.get("address", os.getenv("GROCERY_SCANNER_ADDRESS") or "")
-    port = app.config.get("port", os.getenv("GROCERY_SCANNER_PORT"))
-    bottle.run(app, host=host, port=port)
+    api = BottleAdapter(item_repo, args.config_filename)
+    api()
 
 
 if __name__ == "__main__":
