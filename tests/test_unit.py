@@ -23,5 +23,5 @@ class TestServices(unittest.TestCase):
         item_list = "- [ ] [Item Name](about:blank)"
         generator = services.read_items_from_markdown_str(item_list)
         repo = core.CSVRepository(models.GroceryItem)
-        services.add_items_from_markdown(repo, item_list)
+        services.add_items_from_markdown_content(repo, item_list)
         self.assertIsNotNone(next(generator))
