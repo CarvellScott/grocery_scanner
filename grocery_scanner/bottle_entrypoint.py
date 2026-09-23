@@ -44,11 +44,11 @@ class _HTMLTemplateEnum(enum.Enum):
 
 
 class BottleAdapter:
-    def __init__(self, repo, config_path):
+    def __init__(self, repo, config_content_callback):
         self._repo = repo
         self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
-        self._config_path = config_path
+        self._config_content_callback = config_content_callback
         self._app = None
 
     def change_item_status(self, reference):
@@ -161,7 +161,10 @@ class BottleAdapter:
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/download_server", ["GET"], self.get_executable)
-        app.config.load_config(self._config_path)
+        with tempfile.NamedTemporaryFile("w+") as f:
+            f.write(self._config_content_callback())
+            f.seek(0)
+            app.config.load_config(f.name)
         return app
 
 
@@ -179,6 +182,7 @@ def get_args():
         "-c",
         "--config-filename",
         type=pathlib.Path,
+        default=None,
         help="A .ini file containing configuration for bottle"
     )
 
@@ -196,6 +200,14 @@ def main():
     args = get_args()
     cls = grocery_scanner.models.GroceryItem
     item_repo = grocery_scanner.core.CSVRepository(cls)
+    get_config_content = None
+    runtime_path = pathlib.Path(sys.argv[0]).absolute()
+    if runtime_path.suffix == ".pyz":
+        if args.config_filename:
+            get_config_content = args.config_filename.read_text
+        default_config_path = zipfile.Path(runtime_path, at="config.ini")
+        if default_config_path.exists():
+            get_config_content = default_config_path.read_text
 
     # I want the grocery data to be readable from some simple format.
     # I want it to be borderline trivial to write but still extendable later.
@@ -213,9 +225,9 @@ def main():
 
     if args.grocery_definitions.suffix == ".md":
         with open(args.grocery_definitions, "r") as f:
-            grocery_scanner.services.add_items_from_markdown(item_repo, f.read())
+            grocery_scanner.services.add_items_from_markdown_content(item_repo, f.read())
 
-    api = BottleAdapter(item_repo, args.config_filename)
+    api = BottleAdapter(item_repo, get_config_content)
     api()
 
 

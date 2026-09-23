@@ -59,7 +59,7 @@ def read_items_from_markdown_str(raw_str):
         item = grocery_scanner.models.GroceryItem(reference, name, url)
         yield item
 
-def add_items_from_markdown(repo, raw_str):
+def add_items_from_markdown_content(repo, raw_str):
     for item in read_items_from_markdown_str(raw_str):
         repo.save(item)
 
