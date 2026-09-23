@@ -10,8 +10,11 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 import uuid
 import warnings
+import zipfile
+import zipapp
 
 try:
     import bottle
@@ -123,10 +126,22 @@ class BottleAdapter:
         yield data
 
     def get_executable(self):
-        path = pathlib.Path(sys.argv[0]).absolute()
-        bottle.response.content_type = 'application/zip'
-        with open(path, "rb") as f:
-            return f.read()
+        runtime_path = pathlib.Path(sys.argv[0]).absolute()
+        if runtime_path.suffix != ".pyz":
+            return bottle.abort(503, "The server is not running with this feature supported.")
+
+        config_path = pathlib.Path("config.ini")
+        definitions_path = pathlib.Path("grocery_list.md")
+        paths = [runtime_path, config_path, definitions_path]
+
+        bottle.response.content_type = "application/zip"
+        with tempfile.NamedTemporaryFile("wb+") as temp_fh:
+            zipapp.create_archive(runtime_path, temp_fh, "/usr/bin/env python3")
+            with zipfile.ZipFile(temp_fh, "a") as zip_fh:
+                zip_fh.write(config_path)
+                zip_fh.write(definitions_path)
+            temp_fh.seek(0)
+            return temp_fh.read()
 
     def make_app(self):
         """
