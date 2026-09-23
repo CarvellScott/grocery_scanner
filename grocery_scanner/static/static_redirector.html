@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="text/javascript">
+      function tryRedirect() {
+        const url = new URL(window.location);
+        console.log("url is " + url.toString());
+        const key = url.searchParams.get("id");
+        console.log("key is " + key);
+        const loc = document.getElementById(key).href;
+        window.location.replace(loc);
+      }
+      document.addEventListener("DOMContentLoaded", (event) => {
+        tryRedirect();
+      })
+    </script>
+</head>
+<body>
+    <div>
+        If you are reading this, you either have Javascript disabled or the id of one of the links below doesn't match what was in the URL.
+    </div>
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>Link</th>
+        </tr>
+        % for item_ref, item_name, info_url, shop_url in items:
+            <tr>
+                <td>
+                  <a id="{{item_ref}}" href="{{shop_url}}">{{item_name}}</a>
+                </td>
+                <td>
+                    <a href={{info_url}}>Info</a>
+                </td>
+            </tr>
+        % end
+    </table>
+</body>
+</html>

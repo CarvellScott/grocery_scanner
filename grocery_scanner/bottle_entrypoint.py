@@ -32,6 +32,7 @@ class _HTMLTemplateEnum(enum.Enum):
     HOME_PAGE = "static/home.html"
     ITEM_PAGE = "static/item.html"
     LOGWATCH_PAGE = "static/logwatch.html"
+    STATIC_REDIRECTOR = "static/static_redirector.html"
     STYLES_CSS = "static/styles.css"
 
     def __new__(cls, value):
@@ -92,6 +93,23 @@ class BottleAdapter:
         # into an automatic download, even with Content-Disposition = inline
         bottle.response.content_type = 'text/plain; charset=UTF8'
         return file_data
+
+    def static_redirector(self):
+        repo = self._repo
+        item_list = [repo[key] for key in repo.keys()]
+        item_dct_list = []
+        for item in item_list:
+            info_url = f"/items/{item.reference}"
+            shop_url = item.url
+            entry = [
+                item.reference,
+                item.name,
+                info_url,
+                shop_url
+            ]
+            item_dct_list.append(entry)
+        template = bottle.SimpleTemplate(_HTMLTemplateEnum.STATIC_REDIRECTOR())
+        return template.render(items=item_dct_list)
 
     def nfc_tag_redirect(self, redirect_url):
         """
@@ -161,6 +179,7 @@ class BottleAdapter:
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/download_server", ["GET"], self.get_executable)
+        app.route("/static_redirector", ["GET"], self.static_redirector)
         with tempfile.NamedTemporaryFile("w+") as f:
             f.write(self._config_content_callback())
             f.seek(0)
