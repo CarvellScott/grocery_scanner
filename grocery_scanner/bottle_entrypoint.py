@@ -5,6 +5,7 @@ import datetime
 import enum
 import importlib.resources
 import io
+import json
 import os
 import pathlib
 import re
@@ -45,7 +46,7 @@ class _HTMLTemplateEnum(enum.Enum):
 
 
 class BottleAdapter:
-    def __init__(self, repo, config_content_callback):
+    def __init__(self, repo, config_content_callback=None):
         self._repo = repo
         self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
@@ -98,6 +99,8 @@ class BottleAdapter:
         repo = self._repo
         item_list = [repo[key] for key in repo.keys()]
         item_dct_list = []
+        item_dct = {key: val.url for key, val in dict(repo).items()}
+        item_json = json.dumps(item_dct, indent=2)
         for item in item_list:
             info_url = f"/items/{item.reference}"
             shop_url = item.url
@@ -109,7 +112,7 @@ class BottleAdapter:
             ]
             item_dct_list.append(entry)
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.STATIC_REDIRECTOR())
-        return template.render(items=item_dct_list)
+        return template.render(item_json=item_json, items=item_dct_list)
 
     def nfc_tag_redirect(self, redirect_url):
         """
@@ -180,19 +183,18 @@ class BottleAdapter:
         app.route("/logstream", ["GET"], self.logstream)
         app.route("/download_server", ["GET"], self.get_executable)
         app.route("/static_redirector", ["GET"], self.static_redirector)
-        with tempfile.NamedTemporaryFile("w+") as f:
-            f.write(self._config_content_callback())
-            f.seek(0)
-            app.config.load_config(f.name)
+        if callable(self._config_content_callback):
+            with tempfile.NamedTemporaryFile("w+") as f:
+                f.write(self._config_content_callback())
+                f.seek(0)
+                app.config.load_config(f.name)
         return app
 
 
     def __call__(self):
         app = self.make_app()
-        host = app.config.get("address" or "")
-        port = app.config.get("port", 80)
         self._app = app
-        bottle.run(self._app, host=host, port=port)
+        bottle.run(self._app, debug=True, reloader=True)
 
 
 def get_args():
