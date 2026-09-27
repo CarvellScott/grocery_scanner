@@ -9,14 +9,21 @@ import sqlite3
 import typing
 
 
-class AbstractRepository(typing.Protocol):
+class AbstractRepository(abc.ABC):
+    @abc.abstractmethod
     def save(self, obj):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def load(self, obj):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def obj_to_reference(self, obj):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def iter_items(self):
         raise NotImplementedError
 
 
@@ -56,57 +63,8 @@ class CSVRepository(AbstractRepository):
                 self._data[obj.reference] = obj
 
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        return
-
-    def keys(self):
-        return list(self._data.keys())
-
-    def __getitem__(self, key):
-        return self.load(key)
-
-
-class ShelveRepository(AbstractRepository):
-    def __init__(self):
-        self._db_filename = "scr.shelf"
-
-    def create(self):
-        with shelve.open(self._db_filename, "w") as db:
-            pass
-
-    def save(self, entity):
-        with shelve.open(self._db_filename) as db:
-            reference = self.obj_to_reference(entity)
-            db[reference] = entity
-
-    def load(self, reference):
-        with shelve.open(self._db_filename) as db:
-            return db.get(reference)
-
-    def list(self):
-        with shelve.open(self._db_filename) as db:
-            return [_ for _ in db]
-
-    def obj_to_reference(self, obj):
-        return str(obj.reference)
-
-    def keys(self):
-        with shelve.open(self._db_filename) as db:
-            return tuple(db.keys())
-
-    def __getitem__(self, key):
-        return self.load(key)
-
-
-class Repository(ShelveRepository):
-    def save(self, entity):
-        return super().save(entity)
-
-    def load(self, reference):
-        return super().load(reference)
+    def iter_items(self):
+        return iter(self._data.values())
 
 
 INIT_SCRIPT = """
@@ -151,8 +109,8 @@ class DBWrapper:
         >>> db.init_db()
         >>> expected_item = GroceryItem("test_item", "Test Item", "about:blank")
         >>> db.upsert_item(expected_item)
-        >>> actual_item = db.get_item("test_item")
-        >>> assert dataclasses.asdict(expected_item) == actual_item, actual_item
+        >>> actual_item = GroceryItem(**db.get_item("test_item"))
+        >>> assert expected_item == actual_item
         """
         db_cmd = "SELECT * FROM grocery_item WHERE reference = ?"
         cur = self._db.execute(db_cmd, (reference,))

@@ -7,7 +7,7 @@ import grocery_scanner.models
 import grocery_scanner.utils
 
 def change_item_status(repo, item_id, action):
-    item = repo[item_id]
+    item = repo.load(item_id)
     if action == "request":
         item.status = "requested"
     if action == "fulfill":
@@ -15,9 +15,8 @@ def change_item_status(repo, item_id, action):
     repo.save(item)
 
 def generate_nfc_csv_from_repo(repo, url_prefix):
-    repo_items = [repo[key] for key in repo.keys()]
     nfc_item_list = []
-    for item in repo_items:
+    for item in repo.iter_items():
         url = f"{url_prefix}/{item.reference}"
         name = item.name
         nfc_item_list.append((name, url))
@@ -26,10 +25,9 @@ def generate_nfc_csv_from_repo(repo, url_prefix):
     return file_data
 
 def generate_markdown_item_list(repo):
-    item_list = [repo[key] for key in repo.keys()]
     formatter = "- [ ] [{name}]({url})".format
     lines = []
-    for item in item_list:
+    for item in repo.iter_items():
         lines.append(formatter(name=item.name, url=item.url))
     items_str = "\n".join(lines)
     return items_str

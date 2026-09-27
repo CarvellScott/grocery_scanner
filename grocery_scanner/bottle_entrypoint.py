@@ -60,9 +60,8 @@ class BottleAdapter:
 
     def home_page(self):
         repo = self._repo
-        item_list = [repo[key] for key in repo.keys()]
         item_dct_list = []
-        for item in item_list:
+        for item in repo.iter_items():
             action = "request" if item.status == "OK" else "fulfill"
             info_url = f"/items/{item.reference}"
             shop_url = item.url
@@ -97,11 +96,10 @@ class BottleAdapter:
 
     def static_redirector(self):
         repo = self._repo
-        item_list = [repo[key] for key in repo.keys()]
         item_dct_list = []
-        item_dct = {key: val.url for key, val in dict(repo).items()}
+        item_dct = {_.reference: _.url for _ in repo.iter_items()}
         item_json = json.dumps(item_dct, indent=2)
-        for item in item_list:
+        for item in repo.iter_items():
             info_url = f"/items/{item.reference}"
             shop_url = item.url
             entry = [
