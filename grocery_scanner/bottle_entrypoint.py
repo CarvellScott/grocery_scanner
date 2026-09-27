@@ -196,13 +196,19 @@ class BottleAdapter:
 
 
 def get_args():
+    default_config_path = pathlib.Path("./config.ini")
     parser = argparse.ArgumentParser()
+    extra_help = "Defaults to %(default)s"
     parser.add_argument(
         "-c",
         "--config-filename",
         type=pathlib.Path,
-        default=None,
-        help="A .ini file containing configuration for bottle"
+        default=(default_config_path if default_config_path.exists() else None),
+        required=not default_config_path.exists(),
+        help=(
+            "A .ini file containing configuration. " +
+            (extra_help if default_config_path.exists() else "")
+        )
     )
 
     parser.add_argument(
@@ -221,12 +227,7 @@ def main():
     item_repo = grocery_scanner.core.CSVRepository(cls)
     get_config_content = None
     runtime_path = pathlib.Path(sys.argv[0]).absolute()
-    if runtime_path.suffix == ".pyz":
-        if args.config_filename:
-            get_config_content = args.config_filename.read_text
-        default_config_path = zipfile.Path(runtime_path, at="config.ini")
-        if default_config_path.exists():
-            get_config_content = default_config_path.read_text
+    get_config_content = args.config_filename.read_text
 
     # I want the grocery data to be readable from some simple format.
     # I want it to be borderline trivial to write but still extendable later.
