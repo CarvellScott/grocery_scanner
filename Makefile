@@ -1,13 +1,17 @@
 .PHONY: clean clean-build clean-pyc test install debug
-SERVER_EXECUTABLE=./grocery-scanner-server.pyz
+RUNTIME_DEPS := ./runtime_deps
+SERVER_EXECUTABLE := ./grocery-scanner-server.pyz
 VIRTUAL_ENV := ~/venvs/grocery_scanner
+PIP := ./pip
+CONFIG_FILE := ./config.ini
 
 help: ## You are here
-	@grep -E '^[^: 	]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 clean-build: ## Remove python build artifacts
 	rm -rf build/
 	rm -rf *.egg-info
+	rm -rf $(RUNTIME_DEPS)
 	rm -rf $(SERVER_EXECUTABLE)
 
 clean-pyc: ## Remove python bytecode artifacts
@@ -16,17 +20,17 @@ clean-pyc: ## Remove python bytecode artifacts
 
 clean: clean-build clean-pyc ## Clean EVERYTHING
 
-pip: ## Download a standalone zipapp of pip to avoid whatever shenanigans with system-wide pip
-	curl 'https://bootstrap.pypa.io/pip/pip.pyz' -o pip
+$(PIP): ## Download a standalone zipapp of pip to avoid whatever shenanigans with system-wide pip
+	curl 'https://bootstrap.pypa.io/pip/pip.pyz' -o $(PIP)
 
-runtime_deps: pip pyproject.toml grocery_scanner/* ## Create runtime_deps directory
-	python3 pip install --no-cache-dir --compile -U -t $@/ .
+$(RUNTIME_DEPS): $(PIP) pyproject.toml grocery_scanner/* ## Create directory containing runtime dependencies (assuming the target environment has python)
+	python3 $(PIP) install --no-cache-dir --compile -U -t $@/ .
 
-$(SERVER_EXECUTABLE): runtime_deps ## Make a single-file executable ready to run
-	python3 -m zipapp --compress -p '/usr/bin/env -S python3 -OO' --output $(SERVER_EXECUTABLE) --main 'grocery_scanner.bottle_entrypoint:main' runtime_deps/
+$(SERVER_EXECUTABLE): $(RUNTIME_DEPS) ## Make a single-file executable ready to run
+	python3 -m zipapp --compress -p '/usr/bin/env -S python3 -OO' --output $(SERVER_EXECUTABLE) --main 'grocery_scanner.bottle_entrypoint:main' $(RUNTIME_DEPS)/
 
 run: $(SERVER_EXECUTABLE) ## Run the packaged server/executable with sample data
-	$(SERVER_EXECUTABLE) -c config.ini grocery_list.md
+	$(SERVER_EXECUTABLE) -c $(CONFIG_FILE) grocery_list.md
 
 test: ## Run all tests. Might be broken up into unit, integration and end-to-end tests some day.
 	python3 -m unittest discover tests
@@ -38,4 +42,4 @@ install: $(VIRTUAL_ENV) ## Install an editable version to .venv for quicker iter
 	$(VIRTUAL_ENV)/bin/pip install -e .
 
 debug: $(VIRTUAL_ENV)/bin/grocery-scanner-web ## Run the server with sample config settings
-	@$(VIRTUAL_ENV)/bin/grocery-scanner-web -c config.ini grocery_list.md
+	@$(VIRTUAL_ENV)/bin/grocery-scanner-web -c $(CONFIG_FILE) grocery_list.md
