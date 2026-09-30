@@ -4,10 +4,12 @@ import csv
 import dataclasses
 import hashlib
 import os
+import re
 import shelve
 import sqlite3
 import typing
 
+import grocery_scanner.models
 
 class AbstractRepository(abc.ABC):
     @abc.abstractmethod
@@ -28,9 +30,13 @@ class AbstractRepository(abc.ABC):
 
 
 class CSVRepository(AbstractRepository):
-    def __init__(self, cls):
+    """
+    This class is intended to serve as an abstraction around data storage,
+    specifically writing to .csv for now because if something goes wrong, I
+    don't want to have to walk my parents through SQL.
+    """
+    def __init__(self, cls=None):
         self._data = dict()
-        self._cls = cls
 
     def obj_to_reference(self, obj):
         return hash(obj)
@@ -44,30 +50,45 @@ class CSVRepository(AbstractRepository):
     def clear(self):
         self._data.clear()
 
-    def write_to_file(self, csv_filename):
-        with open(csv_filename, "w") as f:
-            entries = list(map(vars, self._data))
-            header = tuple(entries[0].keys())
-            writer = csv.DictWriter(f, header, dialect="unix")
-            writer.writeheader()
-            for row in entries:
-                writer.writerow(row)
-
-    def read_from_file(self, csv_filename):
-        with open(csv_filename, "r") as f:
-            reader = csv.DictReader(f, fieldnames=["reference", "name", "url"], dialect="unix")
-            for i, row in enumerate(reader):
-                if i == 0:
-                    continue
-                obj = self._cls(**row)
-                self._data[obj.reference] = obj
-
-
     def iter_items(self):
         return iter(self._data.values())
 
+    def write_to_csv_file_handler(self, writeable):
+        entries = list(map(dataclasses.asdict, self._data.values()))
+        header = tuple(entries[0].keys())
+        writer = csv.DictWriter(writeable, header, dialect="unix")
+        writer.writeheader()
+        for row in entries:
+            writer.writerow(row)
 
-INIT_SCRIPT = """
+    def read_from_csv_file_handler(self, readable):
+        reader = csv.DictReader(readable, dialect="unix")
+        for i, row in enumerate(reader):
+            item = grocery_scanner.models.GroceryItem(**row)
+            self.save(item)
+
+    def read_from_csv_file(self, filename):
+        with open(filename, "r") as f:
+            read_from_csv_file_handler(f)
+
+    def read_from_markdown_file_handler(self, readable):
+        identity_regex = re.compile(r"- \[[ x]\] ?\[(.*)\]\((.*)\)")
+        for i, line in enumerate(readable.readlines()):
+            regex_match = identity_regex.search(line)
+            if not regex_match:
+                continue
+            if regex_match:
+                name, url = regex_match.groups()
+            reference = re.sub(r"[^a-zA-Z0-9]", "_", name.lower())
+            item = grocery_scanner.models.GroceryItem(reference, name, url)
+            self.save(item)
+
+    def read_from_markdown_file(self, filename):
+        with open(filename, "r") as f:
+            read_from_markdown_file_handler(f)
+
+
+_INIT_SCRIPT = """
 CREATE TABLE IF NOT EXISTS "grocery_item"(
   "reference" TEXT,
   "name" TEXT,
@@ -75,21 +96,21 @@ CREATE TABLE IF NOT EXISTS "grocery_item"(
 );
 """
 
-def row_factory(cursor, row):
+def _row_factory(cursor, row):
     fields = (_[0] for _ in cursor.description)
     return dict(zip(fields, row))
 
 
-class DBWrapper:
+class _DBWrapper:
     def __init__(self):
         db = sqlite3.connect(os.environ.get("DB_URL") or ":memory:")
-        db.row_factory = row_factory
+        db.row_factory = _row_factory
         self._db = db
 
     def init_db(self):
         db = self._db
         with db:
-            db.executescript(INIT_SCRIPT)
+            db.executescript(_INIT_SCRIPT)
 
     def _generic_insert(self, dataclass_instance):
         fields = dataclasses.fields(dataclass_instance)
@@ -105,7 +126,7 @@ class DBWrapper:
     def get_item(self, reference):
         """
         >>> from grocery_scanner.models import GroceryItem
-        >>> db = DBWrapper()
+        >>> db = _DBWrapper()
         >>> db.init_db()
         >>> expected_item = GroceryItem("test_item", "Test Item", "about:blank")
         >>> db.upsert_item(expected_item)
