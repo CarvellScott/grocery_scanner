@@ -3,7 +3,7 @@ import io
 import unittest
 import dataclasses
 
-from grocery_scanner.core import CSVRepository
+from grocery_scanner.repositories import CSVRepository
 from grocery_scanner.models import GroceryItem
 
 class RepositoryTests(unittest.TestCase):

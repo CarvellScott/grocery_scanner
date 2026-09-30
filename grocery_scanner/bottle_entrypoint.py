@@ -22,7 +22,7 @@ try:
 except ModuleNotFoundError:
     warnings.warn("bottle.py module not found.")
 
-import grocery_scanner.core
+import grocery_scanner.repositories
 import grocery_scanner.models
 import grocery_scanner.services
 
@@ -224,7 +224,7 @@ def get_args():
 def main():
     args = get_args()
     cls = grocery_scanner.models.GroceryItem
-    item_repo = grocery_scanner.core.CSVRepository(cls)
+    item_repo = grocery_scanner.repositories.CSVRepository(cls)
     get_config_content = None
     runtime_path = pathlib.Path(sys.argv[0]).absolute()
     get_config_content = args.config_filename.read_text
