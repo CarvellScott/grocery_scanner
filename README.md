@@ -7,7 +7,7 @@ Create an inexpensive, simple, self-hostable system for managing groceries in wh
 ## Definitions
 
 - Scannable: A QR code, NFC tag, or just some real-world object that can produce a URL for a smart phone.
-- Router Page: A statically-hosted HTML page containing some javascript used to redirect users to other URLs.
+- Static Redirector: A statically-hosted HTML page containing some javascript used to redirect users to other URLs.
 - Main Inventory File: Abbreviated MIF. A markdown file containing groceries following a human-readable but machine-parsable format.
 - Scanner User: A user with a smart phone (or other capable device) that can scan Scannables.
 - Admin User: A user responsible for updating what URLs the Scannables will redirect to.
@@ -17,13 +17,13 @@ Create an inexpensive, simple, self-hostable system for managing groceries in wh
 
 - When a Scanner User scans a Scannable (likely with their smart phone), they SHOULD be able to confirm what item they're adding.
 - An Admin User MUST be able to change what URLs Scannables redirect to without needing to physically modify the Scannables themselves (aside from one-time setup).
-- An Admin User MUST be able to add new entries to the MIF with either a text editor or the same app that generates the Router Page.
+- An Admin User MUST be able to add new entries to the MIF with either a text editor or the same app that generates the Static Redirector.
 - Respect the terms of service of whatever stores are involved within reason.
 
 ## Implementation Details
 
-- All Scannables SHOULD store a link to a Router Page, but each have a single different "id" URL parameter.
-- A Router Page SHOULD use javascript to extract the value of the id parameter, resolve the appropriate shopping link from that id, then redirect the user to that link. 
+- All Scannables SHOULD store a link to a Static Redirector, but each have a single different "id" URL parameter.
+- A Static Redirector SHOULD use javascript to extract the value of the id parameter, resolve the appropriate shopping link from that id, then redirect the user to that link. 
 - The MIF file format SHOULD feature one item per line, preferably in a form that accepts comments or arbitrary data after a link. Currently using markdown formattable as a todo list, e.g.:
 ```
 - [ ] [Apple Chips](https://www.amazon.com/Seneca-Cinnamon-Delicious-Orchards-Perfection/dp/B0977P8GNL/)
