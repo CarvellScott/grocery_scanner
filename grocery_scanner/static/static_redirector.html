@@ -24,18 +24,21 @@
       <li>None of the keys in the inventory match the id in the URL.</li>
       <li>You're here intentionally.</li>
     </ul>
+    <div>
+      You can find links to your items below.
+    </div>
     <table>
         <tr>
             <th>Item</th>
-            <th>Link</th>
+            <th>Extra info</th>
         </tr>
-        % for item_ref, item_name, info_url, shop_url in items:
+        % for item_ref, item_name, shop_url in items:
             <tr>
                 <td>
                   <a id="{{item_ref}}" href="{{shop_url}}">{{item_name}}</a>
                 </td>
                 <td>
-                    <a href={{info_url}}>Info</a>
+                    N/A
                 </td>
             </tr>
         % end

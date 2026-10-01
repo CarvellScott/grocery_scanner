@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+import dataclasses
 import io
 import unittest
-import dataclasses
 
 from grocery_scanner.repositories import CSVRepository
 from grocery_scanner.models import GroceryItem
@@ -56,7 +56,6 @@ class RepositoryTests(unittest.TestCase):
         self.repo.read_from_markdown_file_handler(md_fh)
         actual_item = self.repo.load(self._sample_item.reference)
         self.assertEqual(self._sample_item, actual_item)
-        pass
 
 
 def main():

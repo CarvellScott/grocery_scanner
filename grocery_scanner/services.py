@@ -14,10 +14,10 @@ def change_item_status(repo, item_id, action):
         item.status = "OK"
     repo.save(item)
 
-def generate_nfc_csv_from_repo(repo, url_prefix):
+def generate_nfc_csv_from_repo(repo, formatter):
     nfc_item_list = []
     for item in repo.iter_items():
-        url = f"{url_prefix}/{item.reference}"
+        url = formatter(item.reference)
         name = item.name
         nfc_item_list.append((name, url))
 

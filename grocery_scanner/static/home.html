@@ -6,36 +6,14 @@
 </head>
 <body>
     <div>
-        If you are reading this, you're now able to access Carvell's
-        random experiments by hostname instead of by ip address.
-        And there are no cache issues.
+      Good news, it works! Or at least the home page does.
+      Below you'll find links to other pages.
     </div>
     <h2>Important Links</h2>
     <ul>
     <li><a href="/logwatch"> logwatch </a>
     <li><a href="/grocery_list.md">View markdown-formatted grocery list</a>
+    <li><a href="/static_redirector">Static redirector</a>
     <li><a href="/nfc.csv">Downloadable .csv to write NFC tags in bulk</a>
-    <li><a href="/config.ini">config.ini (prob shouldn't expose this)</a>
-    <li><a href="/download_server">server software</a>
-    <table>
-        <tr>
-            <th>Item</th>
-            <th>Link</th>
-            <th>Status</th>
-        </tr>
-        % for item_ref, item_name, info_url, shop_url, item_action_url, item_action in items:
-            <tr>
-                <td>
-                    <a href="{{info_url}}">{{item_name}}</a>
-                </td>
-                <td>
-                    <a href={{shop_url}}>Shop Online</a>
-                </td>
-                <td>
-                    <a href="{{item_action_url}}">{{item_action}}</a>
-                </td>
-            </tr>
-        % end
-    </table>
 </body>
 </html>

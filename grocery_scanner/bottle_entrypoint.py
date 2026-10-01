@@ -46,12 +46,22 @@ class _HTMLTemplateEnum(enum.Enum):
 
 
 class BottleAdapter:
-    def __init__(self, repo, config_content_callback=None):
+    def __init__(self, repo, config_filepath=None):
         self._repo = repo
         self._start_time = datetime.datetime.now()
         self._secret = str(uuid.uuid4())
-        self._config_content_callback = config_content_callback
+
+        # I'd prefer to supply the config from outside of the constructor, but
+        # bottle needs to read the filepath, a dict, or a module.
+        self._config = None
+        self._config_filepath = config_filepath
+        if self._config_filepath and self._config_filepath.exists():
+            config = configparser.ConfigParser()
+            config.read(self._config_filepath)
+            self._config = config
+
         self._app = None
+
 
     def change_item_status(self, reference):
         action = bottle.request.params.get("action")
@@ -59,66 +69,48 @@ class BottleAdapter:
         return bottle.redirect("/")
 
     def home_page(self):
-        repo = self._repo
-        item_dct_list = []
-        for item in repo.iter_items():
-            action = "request" if item.status == "OK" else "fulfill"
-            info_url = f"/items/{item.reference}"
-            shop_url = item.url
-            action_url = f"/items/{item.reference}?action={action}"
-            entry = [
-                item.reference,
-                item.name,
-                info_url,
-                shop_url,
-                action_url,
-                action.title()
-            ]
-            item_dct_list.append(entry)
-
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.HOME_PAGE())
-        return template.render(items=item_dct_list)
+        return template.render()
 
     def nfc_csv(self):
         """
-        Produce a .csv file of URLS compatible with NXP Tag Writer
+        Produces a .csv file of URLS compatible with NXP Tag Writer
+        The url_prefix here should be the absolute url to whatever hosts the
+        STATIC_REDIRECTOR page.
         """
-        urlparts = bottle.request.urlparts
-        scheme = urlparts.scheme
-        netloc = urlparts.netloc
-        url_prefix = f"{scheme}://{netloc}/nfc/items"
+        url_prefix = bottle.request.params.get("url_prefix")
+        if url_prefix:
+            if "%s" not in url_prefix:
+                return bottle.abort(400, "The 'url_prefix' parameter must be an absolute url with a %s as a placeholder")
 
-        file_data = grocery_scanner.services.generate_nfc_csv_from_repo(self._repo, url_prefix)
+        if not url_prefix:
+            urlparts = bottle.request.urlparts
+            scheme = urlparts.scheme
+            netloc = urlparts.netloc
+            url_prefix = f"{scheme}://{netloc}/nfc/items/%s"
+        formatter = url_prefix.replace("%s", "{}").format
+
+        file_data = grocery_scanner.services.generate_nfc_csv_from_repo(self._repo, formatter)
         # Would use text/csv for MIME type, but browsers insist on turning it
         # into an automatic download, even with Content-Disposition = inline
         bottle.response.content_type = 'text/plain; charset=UTF8'
         return file_data
 
     def static_redirector(self):
+        """
+        This page is intended to be downloadable such that you can upload it to
+        a static webhosting service.
+        """
         repo = self._repo
         item_dct_list = []
         item_dct = {_.reference: _.url for _ in repo.iter_items()}
         item_json = json.dumps(item_dct, indent=2)
         for item in repo.iter_items():
-            info_url = f"/items/{item.reference}"
             shop_url = item.url
-            entry = [
-                item.reference,
-                item.name,
-                info_url,
-                shop_url
-            ]
+            entry = (item.reference, item.name, shop_url)
             item_dct_list.append(entry)
         template = bottle.SimpleTemplate(_HTMLTemplateEnum.STATIC_REDIRECTOR())
         return template.render(item_json=item_json, items=item_dct_list)
-
-    def nfc_tag_redirect(self, redirect_url):
-        """
-        Redirect to whatever url is supplied. Arbitrary redirects are
-        technically a vulnerability, but given the self-hosted service, not
-        really a threat.
-        """
-        return bottle.redirect(redirect_url)
 
     def style(self):
         bottle.response.content_type = 'text/css; charset=UTF8'
@@ -146,23 +138,6 @@ class BottleAdapter:
         data += "\n"
         yield data
 
-    def get_executable(self):
-        runtime_path = pathlib.Path(sys.argv[0]).absolute()
-        if runtime_path.suffix != ".pyz":
-            return bottle.abort(503, "The server is not running with this feature supported.")
-
-        config_path = pathlib.Path("config.ini")
-        definitions_path = pathlib.Path("grocery_list.md")
-        paths = [runtime_path, config_path, definitions_path]
-
-        bottle.response.content_type = "application/zip"
-        with tempfile.NamedTemporaryFile("wb+") as temp_fh:
-            zipapp.create_archive(runtime_path, temp_fh, "/usr/bin/env python3")
-            with zipfile.ZipFile(temp_fh, "a") as zip_fh:
-                zip_fh.write(config_path)
-                zip_fh.write(definitions_path)
-            temp_fh.seek(0)
-            return temp_fh.read()
 
     def make_app(self):
         """
@@ -175,17 +150,11 @@ class BottleAdapter:
         app.route("/items/<reference>", ["GET"], self.change_item_status)
         app.route("/grocery_list.md", ["GET"], self.markdown_grocery_list)
         app.route("/nfc.csv", ["GET"], self.nfc_csv)
-        app.route("/nfc<redirect_url:path>", ["GET"], self.nfc_tag_redirect)
         app.route("/styles.css", ["GET"], self.style)
         app.route("/logwatch", ["GET"], self.logwatch)
         app.route("/logstream", ["GET"], self.logstream)
-        app.route("/download_server", ["GET"], self.get_executable)
         app.route("/static_redirector", ["GET"], self.static_redirector)
-        if callable(self._config_content_callback):
-            with tempfile.NamedTemporaryFile("w+") as f:
-                f.write(self._config_content_callback())
-                f.seek(0)
-                app.config.load_config(f.name)
+        app.config.load_config(self._config_filepath)
         return app
 
 
@@ -201,7 +170,7 @@ def get_args():
     extra_help = "Defaults to %(default)s"
     parser.add_argument(
         "-c",
-        "--config-filename",
+        "--config-filepath",
         type=pathlib.Path,
         default=(default_config_path if default_config_path.exists() else None),
         required=not default_config_path.exists(),
@@ -225,9 +194,7 @@ def main():
     args = get_args()
     cls = grocery_scanner.models.GroceryItem
     item_repo = grocery_scanner.repositories.CSVRepository(cls)
-    get_config_content = None
     runtime_path = pathlib.Path(sys.argv[0]).absolute()
-    get_config_content = args.config_filename.read_text
 
     # I want the grocery data to be readable from some simple format.
     # I want it to be borderline trivial to write but still extendable later.
@@ -245,9 +212,9 @@ def main():
 
     if args.grocery_definitions.suffix == ".md":
         with open(args.grocery_definitions, "r") as f:
-            grocery_scanner.services.add_items_from_markdown_content(item_repo, f.read())
+            item_repo.read_from_markdown_file_handler(f)
 
-    api = BottleAdapter(item_repo, get_config_content)
+    api = BottleAdapter(item_repo, args.config_filepath)
     api()
 
 
